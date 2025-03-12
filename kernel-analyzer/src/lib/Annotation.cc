@@ -29,7 +29,7 @@ using namespace llvm;
 
 static inline bool needAnnotation(Value *V) {
   if (PointerType *PTy = dyn_cast<PointerType>(V->getType())) {
-    Type *Ty = PTy->getElementType();
+    Type *Ty = PTy->getPointerElementType();
     return (Ty->isIntegerTy() || isFunctionPointer(Ty));
   }
   return false;
@@ -254,10 +254,10 @@ std::string getStructId(Value *PVal, User::op_iterator &IS,
 
   Type *PTy = PVal->getType();
   if (PointerType *PtrTy = dyn_cast<PointerType>(PTy)) {
-    STy = dyn_cast<StructType>(PtrTy->getElementType());
+    STy = dyn_cast<StructType>(PtrTy->getPointerElementType());
     if (!STy) {
       /*
-          Type* ETy = PtrTy->getElementType();
+          Type* ETy = PtrTy->getPointerElementType();
           llvm::Type::TypeID ETid = ETy->getTypeID();
           fprintf(stderr, "TypeID: %u\n", ETid);
       */
@@ -421,7 +421,7 @@ std::string getAnonStructId(Value *V, Module *M, StringRef Prefix) {
     break;
   }
 
-  return Prefix;
+  return Prefix.str();
 }
 
 std::string getAnnotation(Value *V, Module *M) {
@@ -496,7 +496,7 @@ std::string getAnnotation(Value *V, Module *M) {
     }
 
     if (CallInst *CI = dyn_cast<CallInst>(v)) {
-      Value *CV = CI->getCalledValue();
+      Value *CV = CI->getCalledOperand();
       // handle simple cast expr
       if (ConstantExpr *CE = dyn_cast<ConstantExpr>(CV)) {
         if (CE->isCast())

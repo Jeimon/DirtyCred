@@ -100,6 +100,13 @@ static std::set<llvm::StringRef> AllocAPIs = {
     "sk_alloc",
 };
 
+
+static std::set<llvm::StringRef> funcDumpPath = {
+  "test_ti_thread_flag",
+};
+
+
+
 class GlobalContext {
 private:
   // pass specific data
@@ -123,6 +130,8 @@ public:
     else
       return nullptr;
   }
+
+  FuncSet IRFuncDumpPath;
 
   // StructAnalyzer
   StructAnalyzer structAnalyzer;

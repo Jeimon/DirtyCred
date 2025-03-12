@@ -29,6 +29,8 @@ public:
   void dumpFuncPtrs();
   void dumpCallees();
   void dumpCallers();
+  void dumpCallPathsForFunc(Function *func, unsigned limits);
+  void dumpCallPathsForFunc();
 };
 
 #endif

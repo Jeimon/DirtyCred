@@ -1,0 +1,112 @@
+[
+  {
+    "arguments": [
+      "/home/jim/Documents/llvm/llvm-project-14.0.6.src/build/bin/clang++",
+      "-I/home/jim/Documents/llvm/llvm-project-14.0.6.src/llvm/include",
+      "-I/home/jim/Documents/llvm/llvm-project-14.0.6.src/build/include",
+      "-std=c++14",
+      "-fno-rtti",
+      "-fpic",
+      "-g",
+      "-D_GNU_SOURCE",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-c",
+      "-o",
+      "CMakeFiles/analyzer.dir/Annotation.cc.o",
+      "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/src/lib/Annotation.cc"
+    ],
+    "directory": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/build/lib",
+    "file": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/src/lib/Annotation.cc",
+    "output": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/build/lib/CMakeFiles/analyzer.dir/Annotation.cc.o"
+  },
+  {
+    "arguments": [
+      "/home/jim/Documents/llvm/llvm-project-14.0.6.src/build/bin/clang++",
+      "-I/home/jim/Documents/llvm/llvm-project-14.0.6.src/llvm/include",
+      "-I/home/jim/Documents/llvm/llvm-project-14.0.6.src/build/include",
+      "-std=c++14",
+      "-fno-rtti",
+      "-fpic",
+      "-g",
+      "-D_GNU_SOURCE",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-c",
+      "-o",
+      "CMakeFiles/analyzer.dir/StructAnalyzer.cc.o",
+      "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/src/lib/StructAnalyzer.cc"
+    ],
+    "directory": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/build/lib",
+    "file": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/src/lib/StructAnalyzer.cc",
+    "output": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/build/lib/CMakeFiles/analyzer.dir/StructAnalyzer.cc.o"
+  },
+  {
+    "arguments": [
+      "/home/jim/Documents/llvm/llvm-project-14.0.6.src/build/bin/clang++",
+      "-I/home/jim/Documents/llvm/llvm-project-14.0.6.src/llvm/include",
+      "-I/home/jim/Documents/llvm/llvm-project-14.0.6.src/build/include",
+      "-std=c++14",
+      "-fno-rtti",
+      "-fpic",
+      "-g",
+      "-D_GNU_SOURCE",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-c",
+      "-o",
+      "CMakeFiles/analyzer.dir/CredAnalyzer.cc.o",
+      "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/src/lib/CredAnalyzer.cc"
+    ],
+    "directory": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/build/lib",
+    "file": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/src/lib/CredAnalyzer.cc",
+    "output": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/build/lib/CMakeFiles/analyzer.dir/CredAnalyzer.cc.o"
+  },
+  {
+    "arguments": [
+      "/home/jim/Documents/llvm/llvm-project-14.0.6.src/build/bin/clang++",
+      "-I/home/jim/Documents/llvm/llvm-project-14.0.6.src/llvm/include",
+      "-I/home/jim/Documents/llvm/llvm-project-14.0.6.src/build/include",
+      "-std=c++14",
+      "-fno-rtti",
+      "-fpic",
+      "-g",
+      "-D_GNU_SOURCE",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-c",
+      "-o",
+      "CMakeFiles/analyzer.dir/KAMain.cc.o",
+      "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/src/lib/KAMain.cc"
+    ],
+    "directory": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/build/lib",
+    "file": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/src/lib/KAMain.cc",
+    "output": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/build/lib/CMakeFiles/analyzer.dir/KAMain.cc.o"
+  },
+  {
+    "arguments": [
+      "/home/jim/Documents/llvm/llvm-project-14.0.6.src/build/bin/clang++",
+      "-I/home/jim/Documents/llvm/llvm-project-14.0.6.src/llvm/include",
+      "-I/home/jim/Documents/llvm/llvm-project-14.0.6.src/build/include",
+      "-std=c++14",
+      "-fno-rtti",
+      "-fpic",
+      "-g",
+      "-D_GNU_SOURCE",
+      "-D__STDC_CONSTANT_MACROS",
+      "-D__STDC_FORMAT_MACROS",
+      "-D__STDC_LIMIT_MACROS",
+      "-c",
+      "-o",
+      "CMakeFiles/analyzer.dir/CallGraph.cc.o",
+      "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/src/lib/CallGraph.cc"
+    ],
+    "directory": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/build/lib",
+    "file": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/src/lib/CallGraph.cc",
+    "output": "/home/jim/Documents/llvm/passes/DirtyCred/kernel-analyzer/build/lib/CMakeFiles/analyzer.dir/CallGraph.cc.o"
+  }
+]

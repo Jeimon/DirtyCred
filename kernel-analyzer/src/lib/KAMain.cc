@@ -109,8 +109,8 @@ void doBasicInitialization(Module *M) {
 
   // collect global object definitions
   for (GlobalVariable &G : M->globals()) {
-    if (G.hasExternalLinkage())
-      GlobalCtx.Gobjs[G.getName()] = &G;
+    // if (G.hasExternalLinkage())
+      // GlobalCtx.Gobjs[G.getName()] = &G;
   }
 
   // collect global function definitions
@@ -178,13 +178,15 @@ int main(int argc, char **argv) {
     doBasicInitialization(Module);
   }
 
-  //   CallGraphPass CGPass(&GlobalCtx);
-  //   CGPass.run(GlobalCtx.Modules);
-  KA_LOGS(0, "ignore allocation? " << IgnoreAllocation << "\n");
-  CredAnalyzerPass CAPass(&GlobalCtx);
-  CAPass.run(GlobalCtx.Modules);
-  GlobalCtx.structAnalyzer.printCredStInfo();
-  GlobalCtx.structAnalyzer.printCredSt();
+  CallGraphPass CGPass(&GlobalCtx);
+  CGPass.run(GlobalCtx.Modules);
+  CGPass.dumpCallPathsForFunc();
+  
+  // KA_LOGS(0, "ignore allocation? " << IgnoreAllocation << "\n");
+  // CredAnalyzerPass CAPass(&GlobalCtx);
+  // CAPass.run(GlobalCtx.Modules);
+  // GlobalCtx.structAnalyzer.printCredStInfo();
+  // GlobalCtx.structAnalyzer.printCredSt();
 
   return 0;
 }

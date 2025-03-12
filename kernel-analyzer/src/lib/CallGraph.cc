@@ -10,7 +10,7 @@
 
 #include <llvm/ADT/StringExtras.h>
 #include <llvm/Analysis/CallGraph.h>
-#include <llvm/IR/CallSite.h>
+// #include <llvm/IR/CallSite.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/InstIterator.h>
@@ -20,6 +20,8 @@
 #include <llvm/Support/Debug.h>
 
 #include "Annotation.h"
+#include "GlobalCtx.h"
+#include "llvm/IR/Function.h"
 #include "CallGraph.h"
 
 using namespace llvm;
@@ -121,7 +123,7 @@ bool CallGraphPass::isCompatibleType(Type *T1, Type *T2) {
 }
 
 bool CallGraphPass::findCalleesByType(CallInst *CI, FuncSet &FS) {
-  CallSite CS(CI);
+  // CallSite CS(CI);
   // errs() << *CI << "\n";
   for (Function *F : Ctx->AddressTakenFuncs) {
 
@@ -129,7 +131,7 @@ bool CallGraphPass::findCalleesByType(CallInst *CI, FuncSet &FS) {
     if (F->getFunctionType()->isVarArg()) {
       // errs() << "VarArg: " << F->getName() << "\n";
       // report_fatal_error("VarArg address taken function\n");
-    } else if (F->arg_size() != CS.arg_size()) {
+    } else if (F->arg_size() != CI->arg_size()) {
       // errs() << "ArgNum mismatch: " << F.getName() << "\n";
       continue;
     } else if (!isCompatibleType(F->getReturnType(), CI->getType())) {
@@ -143,7 +145,7 @@ bool CallGraphPass::findCalleesByType(CallInst *CI, FuncSet &FS) {
 
     // type matching on args
     bool Matched = true;
-    CallSite::arg_iterator AI = CS.arg_begin();
+    auto AI = CI->arg_begin();
     for (Function::arg_iterator FI = F->arg_begin(), FE = F->arg_end();
          FI != FE; ++FI, ++AI) {
       // check type mis-match
@@ -273,7 +275,7 @@ bool CallGraphPass::findFunctions(Value *V, FuncSet &S,
     // update callsite info first
     FuncSet &FS = Ctx->Callees[CI];
     // FS.setCallerInfo(CI, &Ctx->Callers);
-    findFunctions(CI->getCalledValue(), FS);
+    findFunctions(CI->getCalledOperand(), FS);
     bool Changed = false;
     for (Function *CF : FS) {
       bool InsertEmpty = isFunctionPointer(CI->getType());
@@ -323,7 +325,7 @@ bool CallGraphPass::findCallees(CallInst *CI, FuncSet &FS) {
   return findCalleesByType(CI, FS);
 #else
   // use assignments based approach to find possible targets
-  return findFunctions(CI->getCalledValue(), FS);
+  return findFunctions(CI->getCalledOperand(), FS);
 #endif
 }
 
@@ -350,7 +352,7 @@ bool CallGraphPass::runOnFunction(Function *F) {
 
 #ifndef TYPE_BASED
       // looking for function pointer arguments
-      for (unsigned no = 0, ne = CI->getNumArgOperands(); no != ne; ++no) {
+      for (unsigned no = 0, ne = CI->arg_size(); no != ne; ++no) {
         Value *V = CI->getArgOperand(no);
         if (!isFunctionPointerOrVoid(V->getType()))
           continue;
@@ -478,6 +480,12 @@ bool CallGraphPass::doInitialization(Module *M) {
     // collect address-taken functions
     if (F.hasAddressTaken())
       Ctx->AddressTakenFuncs.insert(&F);
+
+    for (auto name: funcDumpPath) {
+      if (F.getName() == name) {
+        (Ctx->IRFuncDumpPath).insert(&F);
+      }
+    }
   }
 
   return false;
@@ -599,4 +607,51 @@ void CallGraphPass::dumpCallers() {
     }
   }
   RES_REPORT("\n[End of dumpCallers]\n");
+}
+
+
+static const char *_builtin_syscall_prefix[] = {
+  "compat_SyS_", "compat_sys_",       "SyS_",        "sys_",
+  "__x64_sys",   "__x32_compat_sys_", "__ia32_sys_", "__ia32_compat_sys_"};
+
+
+bool isSyscall(StringRef str) {
+  for (int i = 0; i < 8; i++)
+    if (str.startswith(_builtin_syscall_prefix[i]))
+      return true;
+  return false;
+}
+
+FuncSet visited;
+
+void CallGraphPass::dumpCallPathsForFunc(Function *func, unsigned limits) {
+  CallInstSet callset = Ctx->Callers[func];
+  if (visited.find(func) != visited.end())
+    return;
+
+  if (callset.size() == 0 || isSyscall(func->getName())) {
+    RES_REPORT(func->getName().str());
+    RES_REPORT(" [You have reached an entry]\n\n");
+  }
+    
+
+  if(limits >= 100) {
+    RES_REPORT("\n[Exceeding the limit]\n");
+    return;
+  }
+
+  visited.insert(func);
+  for (auto callinst : callset) {
+    RES_REPORT(func->getName().str() << ", ");
+    Function *next = callinst->getFunction();
+    dumpCallPathsForFunc(next, limits+1);
+  }
+  visited.erase(func);
+}
+
+
+void CallGraphPass::dumpCallPathsForFunc() {
+  for (auto func : Ctx->IRFuncDumpPath) {
+    dumpCallPathsForFunc(func, 0);
+  }
 }

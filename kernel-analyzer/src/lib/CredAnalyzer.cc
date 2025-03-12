@@ -55,7 +55,7 @@ bool CredAnalyzerPass::doInitialization(Module *M) {
           KA_LOGS(2, "Found at offset " << offset << "\n");
         }
       } else if (auto subPtr = dyn_cast<PointerType>(ele)) {
-        if (auto fileType = dyn_cast<StructType>(subPtr->getElementType())) {
+        if (auto fileType = dyn_cast<StructType>(subPtr->getPointerElementType())) {
           if (creds.find(fileType->getName()) != creds.end()) {
             hasCred = true;
             uint64_t offset = stLayout->getElementOffset(index);
@@ -209,10 +209,10 @@ StringRef CredAnalyzerPass::handleType(Type *ty) {
     // return "";
 
   } else if (ty->isPointerTy()) {
-    ty = cast<PointerType>(ty)->getElementType();
+    ty = cast<PointerType>(ty)->getPointerElementType();
     return handleType(ty);
   } else if (ty->isArrayTy()) {
-    ty = cast<ArrayType>(ty)->getElementType();
+    ty = cast<ArrayType>(ty)->getPointerElementType();
     return handleType(ty);
   } else if (ty->isIntegerTy()) {
     return StringRef("int");
@@ -230,10 +230,10 @@ StructType *CredAnalyzerPass::getStruct(Type *ty) {
     return cast<StructType>(ty);
 
   } else if (ty->isPointerTy()) {
-    ty = cast<PointerType>(ty)->getElementType();
+    ty = cast<PointerType>(ty)->getPointerElementType();
     return getStruct(ty);
   } else if (ty->isArrayTy()) {
-    ty = cast<ArrayType>(ty)->getElementType();
+    ty = cast<ArrayType>(ty)->getPointerElementType();
     return getStruct(ty);
   }
 
@@ -247,7 +247,7 @@ bool CredAnalyzerPass::findCred(StructType *st) {
         return true;
     } else if (isa<PointerType>(ele)) {
       if (auto fileType =
-              dyn_cast<StructType>(cast<PointerType>(ele)->getElementType())) {
+              dyn_cast<StructType>(cast<PointerType>(ele)->getPointerElementType())) {
         if (creds.find(fileType->getName()) != creds.end()) {
           return true;
         }

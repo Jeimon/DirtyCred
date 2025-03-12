@@ -389,7 +389,7 @@ public:
       PointerType *ptrType =
           dyn_cast<PointerType>(GEP->getPointerOperandType());
       assert(ptrType != nullptr);
-      Type *baseType = ptrType->getElementType();
+      Type *baseType = ptrType->getPointerElementType();
       StructType *stType = dyn_cast<StructType>(baseType);
       assert(stType != nullptr);
 
@@ -545,7 +545,7 @@ public:
   unsigned getFieldOffset(unsigned field) const {
     return fieldOffset.at(field);
   }
-  std::set<const llvm::Type *> getElementType(unsigned field) const {
+  std::set<const llvm::Type *> getPointerElementType(unsigned field) const {
     auto itr = elementType.find(field);
     if (itr != elementType.end())
       return itr->second;

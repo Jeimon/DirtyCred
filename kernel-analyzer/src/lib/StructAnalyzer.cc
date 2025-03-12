@@ -30,7 +30,7 @@ void StructAnalyzer::addContainer(const StructType *container,
   for (auto subType : ct->elements()) {
     // strip away array
     while (const ArrayType *arrayType = dyn_cast<ArrayType>(subType))
-      subType = arrayType->getElementType();
+      subType = arrayType->getPointerElementType();
     if (const StructType *structType = dyn_cast<StructType>(subType)) {
       if (!structType->isLiteral()) {
         auto real = structMap.find(getScopeName(structType, M));
@@ -91,7 +91,7 @@ StructInfo &StructAnalyzer::addStructInfo(const StructType *st, const Module *M,
         stInfo.refcountOffset = currentOffset;
       }
     } else if (subType->isPointerTy()) {
-      Type *baseType = cast<PointerType>(subType)->getElementType();
+      Type *baseType = cast<PointerType>(subType)->getPointerElementType();
       if (isa<FunctionType>(baseType)) {
         stInfo.hasFuncPtr = true;
         stInfo.funcPtrOffset.push_back(currentOffset);
