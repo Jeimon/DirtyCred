@@ -650,8 +650,3 @@ void CallGraphPass::dumpCallPathsForFunc(Function *func, unsigned limits) {
 }
 
 
-void CallGraphPass::dumpCallPathsForFunc() {
-  for (auto func : Ctx->IRFuncDumpPath) {
-    dumpCallPathsForFunc(func, 0);
-  }
-}

@@ -11,6 +11,8 @@ set the LLVM_BUILD in the Makefile.inc to your local LLVM BUILD directory before
 ## run the analyzer
 Before dumping the execution path from the syscall to certain functions, you need to give the names of these functions, which should be assigned to the global variable funcDumpPath in GlobalCtx.h.
 
+Specify the struct name and field index by initializing the variable pageStructField in PageAnalyzer.h.
+
 ```bash
 ./analyzer `find your_bitcode_folder -name "*.c.bc"` 
 ```

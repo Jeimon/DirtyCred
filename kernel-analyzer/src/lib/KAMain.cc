@@ -31,6 +31,7 @@
 
 #include "CallGraph.h"
 #include "CredAnalyzer.h"
+#include "PageAnalyzer.h"
 #include "GlobalCtx.h"
 
 using namespace llvm;
@@ -180,7 +181,21 @@ int main(int argc, char **argv) {
 
   CallGraphPass CGPass(&GlobalCtx);
   CGPass.run(GlobalCtx.Modules);
-  CGPass.dumpCallPathsForFunc();
+
+  for (auto func : GlobalCtx.IRFuncDumpPath) {
+    CGPass.dumpCallPathsForFunc(func, 0);
+  }
+
+  // another print
+  errs() << "\n\n---------------------------struct field assignment-------------------------\n";
+
+
+  PageAnalyzerPass PGPass(&GlobalCtx);
+  PGPass.run(GlobalCtx.Modules);
+
+  for (auto func : GlobalCtx.pageAllocation) {
+    CGPass.dumpCallPathsForFunc(func, 0);
+  }
   
   // KA_LOGS(0, "ignore allocation? " << IgnoreAllocation << "\n");
   // CredAnalyzerPass CAPass(&GlobalCtx);

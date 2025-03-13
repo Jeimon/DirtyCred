@@ -20,6 +20,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 #include "Common.h"
 #include "StructAnalyzer.h"
@@ -31,6 +32,9 @@ typedef std::vector<std::pair<llvm::Module *, llvm::StringRef>> ModuleList;
 typedef std::unordered_map<llvm::Module *, llvm::StringRef> ModuleMap;
 typedef std::unordered_map<std::string, llvm::Function *> FuncMap;
 typedef std::unordered_map<std::string, llvm::GlobalVariable *> GObjMap;
+typedef std::list<int> Indices;
+typedef std::list<Value *> ValueList;
+typedef std::unordered_set<Value *> ValueSet;
 
 /****************** Call Graph **************/
 typedef unordered_map<string, llvm::Function *> NameFuncMap;
@@ -132,6 +136,7 @@ public:
   }
 
   FuncSet IRFuncDumpPath;
+  FuncSet pageAllocation;
 
   // StructAnalyzer
   StructAnalyzer structAnalyzer;

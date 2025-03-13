@@ -30,7 +30,7 @@ public:
   void dumpCallees();
   void dumpCallers();
   void dumpCallPathsForFunc(Function *func, unsigned limits);
-  void dumpCallPathsForFunc();
+  // void dumpCallPathsForFunc();
 };
 
 #endif
