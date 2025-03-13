@@ -641,9 +641,13 @@ void CallGraphPass::dumpCallPathsForFunc(Function *func, unsigned limits) {
   }
 
   visited.insert(func);
+  FuncSet nextset;
   for (auto callinst : callset) {
     RES_REPORT(func->getName().str() << ", ");
     Function *next = callinst->getFunction();
+    if (nextset.find(next) != nextset.end())
+      continue;
+    nextset.insert(next);
     dumpCallPathsForFunc(next, limits+1);
   }
   visited.erase(func);
