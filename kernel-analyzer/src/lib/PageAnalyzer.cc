@@ -118,6 +118,8 @@ bool PageAnalyzerPass::isPageStruct(StructType *st, Indices &indices) {
     } else {
         int field = indices.front();
         indices.pop_front();
+        if (field < 0 || st->getNumElements() <= field)
+            return false;
         return isPageStruct(dyn_cast_or_null<StructType>(st->getElementType(field)), indices);
     }
     return false;
