@@ -106,7 +106,7 @@ static std::set<llvm::StringRef> AllocAPIs = {
 
 
 static std::set<llvm::StringRef> funcDumpPath = {
-  "test_ti_thread_flag",
+  "mmu_insert_pages_no_flush",
 };
 
 

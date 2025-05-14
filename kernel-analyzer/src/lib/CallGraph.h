@@ -2,6 +2,29 @@
 #define _CALL_GRAPH_H
 
 #include "GlobalCtx.h"
+#include <string>
+#include <vector>
+#include <map>
+#include <llvm/IR/Function.h>
+
+#ifndef _CALL_GRAPH_H_STRUCT_DEF_
+#define _CALL_GRAPH_H_STRUCT_DEF_
+
+
+struct CallTreeNode {
+    llvm::Function* func;
+    std::string displayName;
+    std::map<llvm::Function*, CallTreeNode*> children;
+
+    CallTreeNode(llvm::Function* f, const std::string& name) : func(f), displayName(name) {}
+
+    ~CallTreeNode() = default;
+
+    CallTreeNode(const CallTreeNode&) = delete;
+    CallTreeNode& operator=(const CallTreeNode&) = delete;
+};
+
+#endif
 
 class CallGraphPass : public IterativeModulePass {
 private:
@@ -18,8 +41,11 @@ private:
   bool findFunctions(llvm::Value *, FuncSet &);
   bool findFunctions(llvm::Value *, FuncSet &,
                      llvm::SmallPtrSet<llvm::Value *, 4>);
+  void recursiveDumpPaths(llvm::Function *currentFunc, unsigned int currentDepth, std::vector<llvm::Function*> &path, FuncSet &visitedNodesInDFS, std::map<llvm::Function*, CallTreeNode*>& activeTreeNodes);
 
 public:
+  std::map<const llvm::Function*, std::map<llvm::Function*, CallTreeNode*>> PerFunctionCallTrees;
+
   CallGraphPass(GlobalContext *Ctx_) : IterativeModulePass(Ctx_, "CallGraph") {}
   virtual bool doInitialization(llvm::Module *);
   virtual bool doFinalization(llvm::Module *);
@@ -30,7 +56,6 @@ public:
   void dumpCallees();
   void dumpCallers();
   void dumpCallPathsForFunc(Function *func, unsigned limits);
-  // void dumpCallPathsForFunc();
 };
 
 #endif
