@@ -12,18 +12,6 @@
 #include "Common.h"
 #include "GlobalCtx.h"
 #include <utility>
-#include <set>
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Value.h"
-#include "llvm/IR/Instructions.h"
-
-// Simplified structure to hold information about the found control struct
-struct PageCtrlStruct {
-    llvm::StructType *IdentifiedStructTy = nullptr;
-    llvm::Value *StructInstanceValue = nullptr; // e.g., the base of the GEP or Alloca
-    llvm::GetElementPtrInst* OriginatingGEP = nullptr; // GEP that revealed the struct
-    // Add other fields if necessary
-};
 
 class PageAnalyzerPass : public IterativeModulePass {
 public:
@@ -40,24 +28,10 @@ public:
   PageAnalyzerPass(GlobalContext *Ctx_)
         : IterativeModulePass(Ctx_, "PageAnalysis") {}
 
-  virtual bool doInitialization(llvm::Module *);
-  virtual bool doFinalization(llvm::Module *);
-  virtual bool doModulePass(llvm::Module *);
-  bool isPageStruct(llvm::StructType *st, Indices& indices);
-
-  // New method for finding control structure
-  PageCtrlStruct findControlStructureForMapOperand(
-      llvm::CallInst *mapCallInst,
-      int physMemArgIdx,
-      unsigned searchDepth
-  );
-
-private: // Add a private section for the helper
-  PageCtrlStruct backwardTraceValue(
-    llvm::Value* currentValue, 
-    unsigned currentDepth,
-    std::set<llvm::Value*>& visited
-  );
+  virtual bool doInitialization(Module *);
+  virtual bool doFinalization(Module *);
+  virtual bool doModulePass(Module *);
+  bool isPageStruct(StructType *st, Indices& indices);
 };
 
 #endif
