@@ -187,16 +187,16 @@ int main(int argc, char **argv) {
   }
 
   // another print
-  errs() << "\n\n---------------------------struct field assignment-------------------------\n";
+  
 
 
   // PageAnalyzerPass PGPass(&GlobalCtx);
   // PGPass.run(GlobalCtx.Modules);
 
   // for (auto func : GlobalCtx.pageAllocation) {
-  //   CGPass.dumpCallPathsForFunc(func, 0);
+    // CGPass.dumpCallPathsForFunc(func, 0);
   // }
-  
+  errs() << "\n\n---------------------------struct field assignment-------------------------\n";
   // KA_LOGS(0, "ignore allocation? " << IgnoreAllocation << "\n");
   // CredAnalyzerPass CAPass(&GlobalCtx);
   // CAPass.run(GlobalCtx.Modules);

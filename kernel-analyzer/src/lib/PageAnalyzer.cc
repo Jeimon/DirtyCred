@@ -46,7 +46,7 @@ bool isPageAllocator (Function *func) {
         !name.compare("alloc_pages_vma"))
         return true;
 
-    if (!name.compare("kbase_mem_alloc_page"))
+    if (!name.compare("kbase_mem_pool_alloc_pages"))
         return true;
 
     if (!name.compare("alloc_pages_node") ||
@@ -154,7 +154,7 @@ bool PageAnalyzerPass::doModulePass(Module *M) {
             StructType *st = dyn_cast_or_null<StructType>(source);
 
             if(isPageStruct(st, indices)) {
-                // errs() << "found: " << *gep << "\n";
+                errs() << "found: " << *gep << "\n";
                 if (usedInStore(gep)) {
                      // the current version does not add the resitriction
                     //  should we add the restriction? the source operand should come from the page allocator?

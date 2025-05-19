@@ -107,6 +107,7 @@ static std::set<llvm::StringRef> AllocAPIs = {
 
 static std::set<llvm::StringRef> funcDumpPath = {
   "mmu_insert_pages_no_flush",
+  // "kbase_mem_pool_alloc_pages",
 };
 
 
@@ -246,3 +247,8 @@ public:
 };
 
 #endif
+
+kbase_ioctl -> kbase_api_mem_import -> kbase_mem_import.2401 -> kbase_gpu_mmap.1554 -> kbase_add_va_region.959 -> kbase_jit_evict -> kbase_mem_free_region.1482 -> kbase_free_alloced_region.938 -> kbase_sticky_resource_release_force.1187 -> release_sticky_resource_meta -> kbase_unmap_external_resource.1271 -> kbase_mem_umm_unmap -> kbase_mmu_teardown_imported_pages -> mmu_teardown_pages -> mmu_flush_invalidate_teardown_pages -> mmu_flush_invalidate -> release_ctx -> kbasep_js_runpool_release_ctx.4507 -> kbasep_js_runpool_release_ctx_and_katom_retained_state.1333 -> kbase_js_sched_all.3727 -> kbase_js_sched.1112 -> kbase_pm_context_active_handle_suspend.1785 -> kbasep_pm_context_active_handle_suspend_locked -> kbase_arbiter_pm_vm_event.1409 -> kbase_arbiter_pm_vm_os_prepare_suspend -> kbase_pm_driver_suspend -> resume_job_scheduling -> kbase_resume_suspended_soft_jobs.1422 -> kbase_process_soft_job.1259 -> kbase_ext_res_process -> kbase_sticky_resource_acquire.1185 -> kbase_map_external_resource.1295 -> kbase_user_buf_from_pinned_to_gpu_mapped -> kbase_user_buf_map -> kbase_mmu_insert_pages_skip_status_update -> mmu_insert_pages_no_flush [You have reached an entry]
+
+kbase_ioctl -> kbase_api_mem_import -> kbase_mem_import.2401 -> kbase_gpu_mmap.1554 -> kbase_add_va_region.959 -> kbase_jit_evict -> kbase_mem_free_region.1482 -> kbase_free_alloced_region.938 -> kbase_sticky_resource_release_force.1187 -> release_sticky_resource_meta -> kbase_unmap_external_resource.1271 -> kbase_mem_umm_unmap -> kbase_mmu_teardown_imported_pages -> mmu_teardown_pages -> mmu_flush_invalidate_teardown_pages -> mmu_flush_invalidate -> release_ctx -> kbasep_js_runpool_release_ctx.4507 -> kbasep_js_runpool_release_ctx_and_katom_retained_state.1333 -> kbase_js_sched_all.1241 -> kbase_js_sched.1112 -> kbase_pm_context_active_handle_suspend.1785 -> kbasep_pm_context_active_handle_suspend_locked -> kbase_arbiter_pm_vm_event.1409 -> kbase_arbiter_pm_vm_os_prepare_suspend -> kbase_pm_driver_suspend -> resume_job_scheduling -> kbase_resume_suspended_soft_jobs.1422 -> kbase_process_soft_job.1259 -> kbase_ext_res_process -> kbase_sticky_resource_acquire.1185 -> kbase_map_external_resource.1295 -> kbase_user_buf_from_pinned_to_gpu_mapped -> kbase_user_buf_map -> kbase_mmu_insert_pages_skip_status_update -> mmu_insert_pages_no_flush [You have reached an entry]
+

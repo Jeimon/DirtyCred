@@ -31,8 +31,6 @@ using namespace llvm;
 // These should be accessible if you plan to use them from KAMain.cc directly after the pass runs.
 // If CallGraph.h doesn't declare them as extern, they are private to this .cc file unless exposed via getters.
 // For simplicity with the current request, defining them here. If CallGraph.h included extern decls, this would be the definition.
-std::map<llvm::Function*, CallTreeNode*> g_physMemAllocCallTreeNodes;
-std::map<llvm::Function*, CallTreeNode*> g_physMemMapCallTreeNodes;
 
 // Static helper function to get or create a node in the specified map
 static CallTreeNode* getOrCreateNodeInTree(llvm::Function* func, 
@@ -691,11 +689,113 @@ void CallGraphPass::dumpCallPathsForFunc(llvm::Function *targetFunc, unsigned in
 }
 
 // recursiveDumpPaths now takes a reference to the specific tree map to populate
+// void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
+//                                        unsigned int currentDepth,
+//                                        std::vector<llvm::Function*> &path,
+//                                        FuncSet &visitedNodesInDFS,
+//                                        std::map<llvm::Function*, CallTreeNode*>& activeTreeNodes) { // Last param changed
+//     if (!currentFunc) return;
+
+//     if (currentDepth >= 100) {
+//         std::string pathStr;
+//         for (int i = path.size() - 1; i >= 0; --i) {
+//             llvm::Function* funcInPath = path[i];
+//             std::string funcNameForDisplay;
+//             if (funcInPath) {
+//                 std::string baseName = getBaseNameIfSuffixedString(funcInPath);
+//                 funcNameForDisplay = !baseName.empty() ? baseName : funcInPath->getName().str();
+//             } else { funcNameForDisplay = "[[INVALID_FUNC_IN_PATH]]"; }
+//             pathStr += funcNameForDisplay;
+//             if (i > 0) pathStr += " -> ";
+//         }
+//         RES_REPORT(pathStr + " ... [Path too deep, limit reached]\n");
+//         return;
+//     }
+
+//     if (visitedNodesInDFS.count(currentFunc)) {
+//         return;
+//     }
+
+//     path.push_back(currentFunc);
+//     visitedNodesInDFS.insert(currentFunc);
+
+//     CallInstSet callers = Ctx->Callers[currentFunc];
+//     if (callers.empty() && !isSyscall(currentFunc->getName())) {
+//         std::string baseNameStr = getBaseNameIfSuffixedString(currentFunc);
+//         if (!baseNameStr.empty()) {
+//             llvm::Module *M = currentFunc->getParent();
+//             if (M) {
+//                 llvm::Function *baseFunc = M->getFunction(baseNameStr);
+//                 if (baseFunc && baseFunc != currentFunc) {
+//                     auto it = Ctx->Callers.find(baseFunc);
+//                     if (it != Ctx->Callers.end() && !it->second.empty()) {
+//                         callers = it->second;
+//                     }
+//                 }
+//             }
+//         }
+//     }
+
+//     if (callers.empty() || isSyscall(currentFunc->getName())) {
+//         std::string pathStr;
+//         for (int i = path.size() - 1; i >= 0; --i) {
+//             llvm::Function* funcInPath = path[i];
+//             std::string funcNameForDisplay;
+//             if (funcInPath) {
+//                 std::string baseName = getBaseNameIfSuffixedString(funcInPath);
+//                 funcNameForDisplay = !baseName.empty() ? baseName : funcInPath->getName().str();
+//             } else { funcNameForDisplay = "[[INVALID_FUNC_IN_PATH]]"; }
+//             pathStr += funcNameForDisplay;
+//             if (i > 0) { pathStr += " -> "; }
+//         }
+//         RES_REPORT(pathStr);
+//         RES_REPORT(" [You have reached an entry]\n\n");
+
+//         // Tree building logic now uses the passed 'activeTreeNodes' reference
+//         CallTreeNode* parentTreeNode = nullptr;
+//         // Iterate path from entry point (last in 'path' vector) down to target (first in 'path' vector)
+//         for (int i = path.size() - 1; i >= 0; --i) {
+//             llvm::Function* pathFunc = path[i];
+//             if (!pathFunc) continue;
+
+//             std::string funcNameForDisplay;
+//             std::string baseName = getBaseNameIfSuffixedString(pathFunc);
+//             funcNameForDisplay = !baseName.empty() ? baseName : pathFunc->getName().str();
+//             if (funcNameForDisplay.empty() && pathFunc) funcNameForDisplay = pathFunc->getName().str(); 
+//             if (funcNameForDisplay.empty()) funcNameForDisplay = "[[UNKNOWN_FUNC]]";
+
+//             CallTreeNode* currentTreeNode = getOrCreateNodeInTree(pathFunc, funcNameForDisplay, activeTreeNodes);
+//             if (!currentTreeNode) continue;
+
+//             if (parentTreeNode) {
+//                 if (parentTreeNode->children.find(pathFunc) == parentTreeNode->children.end()) {
+//                     parentTreeNode->children[pathFunc] = currentTreeNode;
+//                 }
+//             }
+//             parentTreeNode = currentTreeNode;
+//         }
+//     } else {
+//         // Recursive step
+//         FuncSet processedCallers;
+//         for (llvm::CallInst *ci : callers) {
+//             llvm::Function *callerFunc = ci->getFunction();
+//             if (callerFunc && !processedCallers.count(callerFunc)) {
+//                 processedCallers.insert(callerFunc);
+//                 // Pass 'activeTreeNodes' down in the recursive call
+//                 recursiveDumpPaths(callerFunc, currentDepth + 1, path, visitedNodesInDFS, activeTreeNodes);
+//             }
+//         }
+//     }
+
+//     visitedNodesInDFS.erase(currentFunc);
+//     path.pop_back();
+// }
+// recursiveDumpPaths now takes a reference to the specific tree map to populate
 void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
                                        unsigned int currentDepth,
                                        std::vector<llvm::Function*> &path,
                                        FuncSet &visitedNodesInDFS,
-                                       std::map<llvm::Function*, CallTreeNode*>& activeTreeNodes) { // Last param changed
+                                       std::map<llvm::Function*, CallTreeNode*>& activeTreeNodes) {
     if (!currentFunc) return;
 
     if (currentDepth >= 100) {
@@ -706,6 +806,7 @@ void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
             if (funcInPath) {
                 std::string baseName = getBaseNameIfSuffixedString(funcInPath);
                 funcNameForDisplay = !baseName.empty() ? baseName : funcInPath->getName().str();
+                // funcNameForDisplay = funcInPath->getName().str();
             } else { funcNameForDisplay = "[[INVALID_FUNC_IN_PATH]]"; }
             pathStr += funcNameForDisplay;
             if (i > 0) pathStr += " -> ";
@@ -717,28 +818,56 @@ void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
     if (visitedNodesInDFS.count(currentFunc)) {
         return;
     }
-
+ 
     path.push_back(currentFunc);
     visitedNodesInDFS.insert(currentFunc);
 
-    CallInstSet callers = Ctx->Callers[currentFunc];
-    if (callers.empty() && !isSyscall(currentFunc->getName())) {
-        std::string baseNameStr = getBaseNameIfSuffixedString(currentFunc);
-        if (!baseNameStr.empty()) {
-            llvm::Module *M = currentFunc->getParent();
-            if (M) {
-                llvm::Function *baseFunc = M->getFunction(baseNameStr);
-                if (baseFunc && baseFunc != currentFunc) {
-                    auto it = Ctx->Callers.find(baseFunc);
-                    if (it != Ctx->Callers.end() && !it->second.empty()) {
-                        callers = it->second;
+    // --- START MODIFICATION ---
+    CallInstSet aggregatedCallers;
+    llvm::Module *M = currentFunc->getParent();
+
+    // 1. Add direct callers of currentFunc
+    auto itCurrent = Ctx->Callers.find(currentFunc);
+    if (itCurrent != Ctx->Callers.end()) {
+        aggregatedCallers.insert(itCurrent->second.begin(), itCurrent->second.end());
+    }
+
+    if (M) { // Ensure module context is available
+        std::string baseNameOfCurrent = getBaseNameIfSuffixedString(currentFunc);
+
+        if (!baseNameOfCurrent.empty()) {
+            // currentFunc is a suffixed version (e.g., "foo.1234").
+            // Add callers of its base function ("foo").
+            llvm::Function *baseFunc = M->getFunction(baseNameOfCurrent);
+            if (baseFunc && baseFunc != currentFunc) { // Make sure baseFunc is valid and not currentFunc itself
+                auto itBase = Ctx->Callers.find(baseFunc);
+                if (itBase != Ctx->Callers.end()) {
+                    aggregatedCallers.insert(itBase->second.begin(), itBase->second.end());
+                }
+            }
+        } else {
+            // currentFunc is a base name (e.g., "foo") or not suffixed in the .NNNN pattern.
+            // Add callers of all its suffixed versions (e.g., "foo.1", "foo.2345").
+            StringRef currentFuncNameRef = currentFunc->getName();
+            for (llvm::Function &PotentialSuffixedF : *M) {
+                if (&PotentialSuffixedF == currentFunc) continue; // Skip itself
+
+                std::string baseNameOfPotential = getBaseNameIfSuffixedString(&PotentialSuffixedF);
+                // Check if PotentialSuffixedF is a suffixed version of currentFunc
+                if (!baseNameOfPotential.empty() && baseNameOfPotential == currentFuncNameRef) {
+                    auto itSuffixed = Ctx->Callers.find(&PotentialSuffixedF);
+                    if (itSuffixed != Ctx->Callers.end()) {
+                        aggregatedCallers.insert(itSuffixed->second.begin(), itSuffixed->second.end());
                     }
                 }
             }
         }
     }
+    // --- END MODIFICATION ---
 
-    if (callers.empty() || isSyscall(currentFunc->getName())) {
+    // Now, use aggregatedCallers instead of the old 'callers' variable
+    if (aggregatedCallers.empty() || isSyscall(currentFunc->getName())) {
+        // Path termination logic (entry point or syscall reached)
         std::string pathStr;
         for (int i = path.size() - 1; i >= 0; --i) {
             llvm::Function* funcInPath = path[i];
@@ -746,6 +875,7 @@ void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
             if (funcInPath) {
                 std::string baseName = getBaseNameIfSuffixedString(funcInPath);
                 funcNameForDisplay = !baseName.empty() ? baseName : funcInPath->getName().str();
+                // funcNameForDisplay = funcInPath->getName().str();
             } else { funcNameForDisplay = "[[INVALID_FUNC_IN_PATH]]"; }
             pathStr += funcNameForDisplay;
             if (i > 0) { pathStr += " -> "; }
@@ -753,9 +883,7 @@ void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
         RES_REPORT(pathStr);
         RES_REPORT(" [You have reached an entry]\n\n");
 
-        // Tree building logic now uses the passed 'activeTreeNodes' reference
         CallTreeNode* parentTreeNode = nullptr;
-        // Iterate path from entry point (last in 'path' vector) down to target (first in 'path' vector)
         for (int i = path.size() - 1; i >= 0; --i) {
             llvm::Function* pathFunc = path[i];
             if (!pathFunc) continue;
@@ -763,6 +891,7 @@ void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
             std::string funcNameForDisplay;
             std::string baseName = getBaseNameIfSuffixedString(pathFunc);
             funcNameForDisplay = !baseName.empty() ? baseName : pathFunc->getName().str();
+            // funcNameForDisplay = pathFunc->getName().str();
             if (funcNameForDisplay.empty() && pathFunc) funcNameForDisplay = pathFunc->getName().str(); 
             if (funcNameForDisplay.empty()) funcNameForDisplay = "[[UNKNOWN_FUNC]]";
 
@@ -778,12 +907,12 @@ void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
         }
     } else {
         // Recursive step
-        FuncSet processedCallers;
-        for (llvm::CallInst *ci : callers) {
-            llvm::Function *callerFunc = ci->getFunction();
+        FuncSet processedCallers; // To avoid redundant recursive calls for the same caller function
+        for (llvm::CallInst *ci : aggregatedCallers) {
+            // The function that CONTAINS this call instruction is the actual caller function
+            llvm::Function *callerFunc = ci->getParent()->getParent(); 
             if (callerFunc && !processedCallers.count(callerFunc)) {
                 processedCallers.insert(callerFunc);
-                // Pass 'activeTreeNodes' down in the recursive call
                 recursiveDumpPaths(callerFunc, currentDepth + 1, path, visitedNodesInDFS, activeTreeNodes);
             }
         }
