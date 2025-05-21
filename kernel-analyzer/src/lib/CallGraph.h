@@ -42,7 +42,13 @@ private:
   bool findFunctions(llvm::Value *, FuncSet &,
                      llvm::SmallPtrSet<llvm::Value *, 4>);
   void recursiveDumpPaths(llvm::Function *currentFunc, unsigned int currentDepth, std::vector<llvm::Function*> &path, FuncSet &visitedNodesInDFS, std::map<llvm::Function*, CallTreeNode*>& activeTreeNodes);
-
+  void backwardTraceForControlStructure(
+    llvm::Value* startValue,
+    const std::string& pathIdentifier,
+    std::set<llvm::Value*>& potentialControlStructures,
+    const std::vector<llvm::Function*>& currentCallPath,
+    llvm::Function* rootInterfaceFuncForThisPath
+);
 public:
   std::map<const llvm::Function*, std::map<llvm::Function*, CallTreeNode*>> PerFunctionCallTrees;
 

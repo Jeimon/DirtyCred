@@ -18,6 +18,8 @@
 #include <llvm/IR/Module.h>
 #include <llvm/Pass.h>
 #include <llvm/Support/Debug.h>
+#include <queue>
+#include <set>
 
 #include "Annotation.h"
 #include "GlobalCtx.h"
@@ -312,8 +314,7 @@ bool CallGraphPass::findFunctions(Value *V, FuncSet &S,
       bool InsertEmpty = isFunctionPointer(L->getType());
       return mergeFuncSet(S, Id, InsertEmpty);
     } else {
-      Function *f = L->getParent()->getParent();
-      // errs() << "Empty LoadID: " << f->getName() << "::" << *L << "\n";
+      // errs() << "Empty LoadID: " << F->getName() << "::" << *L << "\n";
       return false;
     }
   }
@@ -689,108 +690,6 @@ void CallGraphPass::dumpCallPathsForFunc(llvm::Function *targetFunc, unsigned in
 }
 
 // recursiveDumpPaths now takes a reference to the specific tree map to populate
-// void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
-//                                        unsigned int currentDepth,
-//                                        std::vector<llvm::Function*> &path,
-//                                        FuncSet &visitedNodesInDFS,
-//                                        std::map<llvm::Function*, CallTreeNode*>& activeTreeNodes) { // Last param changed
-//     if (!currentFunc) return;
-
-//     if (currentDepth >= 100) {
-//         std::string pathStr;
-//         for (int i = path.size() - 1; i >= 0; --i) {
-//             llvm::Function* funcInPath = path[i];
-//             std::string funcNameForDisplay;
-//             if (funcInPath) {
-//                 std::string baseName = getBaseNameIfSuffixedString(funcInPath);
-//                 funcNameForDisplay = !baseName.empty() ? baseName : funcInPath->getName().str();
-//             } else { funcNameForDisplay = "[[INVALID_FUNC_IN_PATH]]"; }
-//             pathStr += funcNameForDisplay;
-//             if (i > 0) pathStr += " -> ";
-//         }
-//         RES_REPORT(pathStr + " ... [Path too deep, limit reached]\n");
-//         return;
-//     }
-
-//     if (visitedNodesInDFS.count(currentFunc)) {
-//         return;
-//     }
-
-//     path.push_back(currentFunc);
-//     visitedNodesInDFS.insert(currentFunc);
-
-//     CallInstSet callers = Ctx->Callers[currentFunc];
-//     if (callers.empty() && !isSyscall(currentFunc->getName())) {
-//         std::string baseNameStr = getBaseNameIfSuffixedString(currentFunc);
-//         if (!baseNameStr.empty()) {
-//             llvm::Module *M = currentFunc->getParent();
-//             if (M) {
-//                 llvm::Function *baseFunc = M->getFunction(baseNameStr);
-//                 if (baseFunc && baseFunc != currentFunc) {
-//                     auto it = Ctx->Callers.find(baseFunc);
-//                     if (it != Ctx->Callers.end() && !it->second.empty()) {
-//                         callers = it->second;
-//                     }
-//                 }
-//             }
-//         }
-//     }
-
-//     if (callers.empty() || isSyscall(currentFunc->getName())) {
-//         std::string pathStr;
-//         for (int i = path.size() - 1; i >= 0; --i) {
-//             llvm::Function* funcInPath = path[i];
-//             std::string funcNameForDisplay;
-//             if (funcInPath) {
-//                 std::string baseName = getBaseNameIfSuffixedString(funcInPath);
-//                 funcNameForDisplay = !baseName.empty() ? baseName : funcInPath->getName().str();
-//             } else { funcNameForDisplay = "[[INVALID_FUNC_IN_PATH]]"; }
-//             pathStr += funcNameForDisplay;
-//             if (i > 0) { pathStr += " -> "; }
-//         }
-//         RES_REPORT(pathStr);
-//         RES_REPORT(" [You have reached an entry]\n\n");
-
-//         // Tree building logic now uses the passed 'activeTreeNodes' reference
-//         CallTreeNode* parentTreeNode = nullptr;
-//         // Iterate path from entry point (last in 'path' vector) down to target (first in 'path' vector)
-//         for (int i = path.size() - 1; i >= 0; --i) {
-//             llvm::Function* pathFunc = path[i];
-//             if (!pathFunc) continue;
-
-//             std::string funcNameForDisplay;
-//             std::string baseName = getBaseNameIfSuffixedString(pathFunc);
-//             funcNameForDisplay = !baseName.empty() ? baseName : pathFunc->getName().str();
-//             if (funcNameForDisplay.empty() && pathFunc) funcNameForDisplay = pathFunc->getName().str(); 
-//             if (funcNameForDisplay.empty()) funcNameForDisplay = "[[UNKNOWN_FUNC]]";
-
-//             CallTreeNode* currentTreeNode = getOrCreateNodeInTree(pathFunc, funcNameForDisplay, activeTreeNodes);
-//             if (!currentTreeNode) continue;
-
-//             if (parentTreeNode) {
-//                 if (parentTreeNode->children.find(pathFunc) == parentTreeNode->children.end()) {
-//                     parentTreeNode->children[pathFunc] = currentTreeNode;
-//                 }
-//             }
-//             parentTreeNode = currentTreeNode;
-//         }
-//     } else {
-//         // Recursive step
-//         FuncSet processedCallers;
-//         for (llvm::CallInst *ci : callers) {
-//             llvm::Function *callerFunc = ci->getFunction();
-//             if (callerFunc && !processedCallers.count(callerFunc)) {
-//                 processedCallers.insert(callerFunc);
-//                 // Pass 'activeTreeNodes' down in the recursive call
-//                 recursiveDumpPaths(callerFunc, currentDepth + 1, path, visitedNodesInDFS, activeTreeNodes);
-//             }
-//         }
-//     }
-
-//     visitedNodesInDFS.erase(currentFunc);
-//     path.pop_back();
-// }
-// recursiveDumpPaths now takes a reference to the specific tree map to populate
 void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
                                        unsigned int currentDepth,
                                        std::vector<llvm::Function*> &path,
@@ -806,7 +705,6 @@ void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
             if (funcInPath) {
                 std::string baseName = getBaseNameIfSuffixedString(funcInPath);
                 funcNameForDisplay = !baseName.empty() ? baseName : funcInPath->getName().str();
-                // funcNameForDisplay = funcInPath->getName().str();
             } else { funcNameForDisplay = "[[INVALID_FUNC_IN_PATH]]"; }
             pathStr += funcNameForDisplay;
             if (i > 0) pathStr += " -> ";
@@ -875,7 +773,6 @@ void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
             if (funcInPath) {
                 std::string baseName = getBaseNameIfSuffixedString(funcInPath);
                 funcNameForDisplay = !baseName.empty() ? baseName : funcInPath->getName().str();
-                // funcNameForDisplay = funcInPath->getName().str();
             } else { funcNameForDisplay = "[[INVALID_FUNC_IN_PATH]]"; }
             pathStr += funcNameForDisplay;
             if (i > 0) { pathStr += " -> "; }
@@ -883,7 +780,101 @@ void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
         RES_REPORT(pathStr);
         RES_REPORT(" [You have reached an entry]\n\n");
 
+        // 修改：根据函数名分析根接口特定参数的控制结构
+        std::set<llvm::Value*> pathControlStructures;
+        llvm::Function* targetOfPath = nullptr;
+        if (!path.empty()) {
+             targetOfPath = path[0]; // path[0] 是路径的目标函数 (root interface)
+        }
+
+        // Variables for argument analysis based on function name
+        unsigned arg_idx_to_analyze = 3; // Default to 4th argument (0-indexed for iteration)
+        unsigned min_args_required = 4;  // Default requirement for 4th argument
+        std::string arg_description_str = "4th"; // Default description
+
+        bool analysis_was_attempted = false; // Flag to check if we tried to analyze args
+
+        if (targetOfPath) {
+            std::string funcNameStr = targetOfPath->getName().str();
+            if (funcNameStr == "kbase_mmu_insert_single_page") {
+                arg_idx_to_analyze = 2; // Analyze 3rd argument (0-indexed for iteration)
+                min_args_required = 3;  // Min args for 3rd argument
+                arg_description_str = "3rd";
+            }
+            // Future 'else if' conditions for other function-specific argument analysis can be added here.
+
+            if (targetOfPath->arg_size() >= min_args_required) {
+                analysis_was_attempted = true; // We are attempting the analysis.
+                llvm::Argument* targetArgument = nullptr;
+                unsigned current_arg_idx = 0;
+                for (llvm::Argument &arg : targetOfPath->args()) {
+                    if (current_arg_idx == arg_idx_to_analyze) {
+                        targetArgument = &arg;
+                        break;
+                    }
+                    current_arg_idx++;
+                }
+
+                if (targetArgument) {
+                    std::string targetArgNameStr = targetArgument->hasName() ? targetArgument->getName().str() : "unnamed_arg";
+                    RES_REPORT("  Analyzing origin of " << arg_description_str << " argument ('" << targetArgNameStr << "') for root interface: " << funcNameStr << " in path: " << pathStr << "\n");
+                    // 从目标参数开始向后追溯
+                    backwardTraceForControlStructure(targetArgument, pathStr, pathControlStructures, path, path.back());
+                } else {
+                    // This case should ideally not be hit if arg_size check is correct and arg_idx_to_analyze is valid.
+                    RES_REPORT("  Error: Could not retrieve " << arg_description_str << " argument for root interface: " << funcNameStr << " (expected index " << arg_idx_to_analyze << ", " << targetOfPath->arg_size() << " args available)\n");
+                }
+            } else {
+                RES_REPORT("  Root interface " << funcNameStr << " has " << targetOfPath->arg_size() << " arguments (fewer than " << min_args_required << "). Skipping control structure analysis for " << arg_description_str << " arg.\n");
+            }
+        } else {
+            RES_REPORT("  Path is empty, cannot determine target function for control structure analysis.\n");
+        }
+
+        // Reporting on pathControlStructures
+        if (!pathControlStructures.empty()) {
+            // arg_description_str is correctly set if targetOfPath was true and analysis was possible.
+            RES_REPORT("    Potential Control Structures sourcing/related to the " << arg_description_str << " argument of '" << (targetOfPath ? targetOfPath->getName().str() : "UNKNOWN_TARGET") << "' for path '" << pathStr << "':\n");
+            for (llvm::Value* val : pathControlStructures) {
+                std::string valStr;
+                llvm::raw_string_ostream rso(valStr);
+                val->print(rso);
+                
+                llvm::Type* valType = val->getType();
+                std::string typeStr;
+                llvm::raw_string_ostream rtso(typeStr);
+                valType->print(rtso);
+
+                RES_REPORT("      - Value: " << rso.str() << " | Type: " << rtso.str());
+                if (llvm::Instruction *I = llvm::dyn_cast<llvm::Instruction>(val)) {
+                    if (I->getFunction() && I->getFunction()->hasName()) {
+                         RES_REPORT(" (In Function: " << I->getFunction()->getName().str() << ")");
+                    }
+                } else if (llvm::Argument *A = llvm::dyn_cast<llvm::Argument>(val)) {
+                     if (A->getParent() && A->getParent()->hasName()) {
+                        RES_REPORT(" (Argument of Function: " << A->getParent()->getName().str() << ")");
+                     }
+                } else if (llvm::GlobalValue *GV = llvm::dyn_cast<llvm::GlobalValue>(val)) {
+                    if (GV->hasName()) {
+                        RES_REPORT(" (GlobalVariable: " << GV->getName().str() << ")");
+                    } else {
+                        RES_REPORT(" (Anonymous GlobalValue)");
+                    }
+                }
+                RES_REPORT("\n");
+            }
+        } else {
+            // Only print "No specific control structures" if analysis was attempted but yielded no results.
+            // analysis_was_attempted is true if targetOfPath was valid AND arg count was sufficient to try.
+            if (analysis_was_attempted) { 
+                 RES_REPORT("    No specific control structures identified sourcing/related to the " << arg_description_str << " argument for path: " << pathStr << "\n");
+            }
+        }
+        RES_REPORT("\n");
+        
+        // Tree building logic now uses the passed 'activeTreeNodes' reference
         CallTreeNode* parentTreeNode = nullptr;
+        // Iterate path from entry point (last in 'path' vector) down to target (first in 'path' vector)
         for (int i = path.size() - 1; i >= 0; --i) {
             llvm::Function* pathFunc = path[i];
             if (!pathFunc) continue;
@@ -891,7 +882,6 @@ void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
             std::string funcNameForDisplay;
             std::string baseName = getBaseNameIfSuffixedString(pathFunc);
             funcNameForDisplay = !baseName.empty() ? baseName : pathFunc->getName().str();
-            // funcNameForDisplay = pathFunc->getName().str();
             if (funcNameForDisplay.empty() && pathFunc) funcNameForDisplay = pathFunc->getName().str(); 
             if (funcNameForDisplay.empty()) funcNameForDisplay = "[[UNKNOWN_FUNC]]";
 
@@ -920,6 +910,128 @@ void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
 
     visitedNodesInDFS.erase(currentFunc);
     path.pop_back();
+}
+
+void CallGraphPass::backwardTraceForControlStructure(
+    llvm::Value* startValue,
+    const std::string& pathIdentifier,
+    std::set<llvm::Value*>& potentialControlStructures,
+    const std::vector<llvm::Function*>& currentCallPath,
+    llvm::Function* rootInterfaceFuncForThisPath
+) {
+    if (!startValue) return;
+
+    std::queue<llvm::Value*> analysisQueue;
+    std::set<llvm::Value*> visitedInThisTrace; // 在本次特定追溯中访问过的值
+
+    analysisQueue.push(startValue);
+
+    unsigned iterations = 0; // 用于防止追溯过深的计数器
+    const unsigned MAX_ITERATIONS = 200; // 每次启动追溯时探索的最大项目/深度
+
+    while (!analysisQueue.empty() && iterations < MAX_ITERATIONS) {
+        iterations++;
+        llvm::Value* current = analysisQueue.front();
+        analysisQueue.pop();
+
+        if (!visitedInThisTrace.insert(current).second) {
+            continue;
+        }
+
+        bool isPotentialCS = false;
+        llvm::Type* currentType = current->getType();
+
+        if (currentType->isPointerTy()) {
+            llvm::Type* pointedType = currentType->getPointerElementType();
+            if (pointedType->isStructTy()) {
+                if (llvm::StructType* ST = llvm::dyn_cast<llvm::StructType>(pointedType)) {
+                    if (ST->getNumElements() > 1) { // 结构体必须包含多于1个字段
+                        isPotentialCS = true;
+                    }
+                }
+            }
+        }
+        
+        if (llvm::AllocaInst* AI = llvm::dyn_cast<llvm::AllocaInst>(current)) {
+            llvm::Type* allocatedType = AI->getAllocatedType();
+            if (allocatedType->isStructTy()) {
+                 if (llvm::StructType* ST = llvm::dyn_cast<llvm::StructType>(allocatedType)) {
+                    if (ST->getNumElements() > 1) { // 结构体必须包含多于1个字段
+                        isPotentialCS = true;
+                    }
+                }
+            }
+        }
+
+        if (isPotentialCS) {
+            potentialControlStructures.insert(current);
+        }
+
+        // 向后追溯逻辑 (指令的操作数, PHI节点的来源等)
+        if (llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(current)) {
+            for (Use &U : I->operands()) { // 遍历操作数以进行反向流动
+                Value *operand = U.get();
+                // 避免追溯常量，除非它们是全局变量 (指针)
+                if (llvm::isa<llvm::Constant>(operand) && !llvm::isa<llvm::GlobalValue>(operand)) {
+                    continue;
+                }
+                analysisQueue.push(operand);
+            }
+        } else if (llvm::Argument* current_arg = llvm::dyn_cast<llvm::Argument>(current)) {
+            llvm::Function* callee_function = current_arg->getParent();
+            unsigned arg_no = current_arg->getArgNo();
+
+            // 如果当前函数已经是我们这条路径的入口点（或已追溯到最顶层我们关心的函数），则停止向上追溯
+            if (callee_function == rootInterfaceFuncForThisPath && currentCallPath.size() <=1 ) { // rootInterfaceFuncForThisPath 是路径最顶层的函数，或者说最开始的调用者
+                 // 或者根据path的顶端来判断
+                bool is_entry_of_path = false;
+                if (!currentCallPath.empty() && callee_function == currentCallPath.back()) { // .back() 是路径的入口/最上层
+                     is_entry_of_path = true;
+                }
+                if(is_entry_of_path) {
+                    //已经到达调用链的顶端（对于这条特定路径而言），不再向上追溯此参数的来源
+                } else {
+                     // 仍然可以向上追溯
+                }
+            }
+
+
+            // 在 currentCallPath 中找到 callee_function 的直接调用者
+            llvm::Function* specific_caller_in_path = nullptr;
+            for (size_t i = 0; i < currentCallPath.size(); ++i) {
+                if (currentCallPath[i] == callee_function) {
+                    if (i + 1 < currentCallPath.size()) { // 确保它不是路径的第一个函数（入口点）
+                        specific_caller_in_path = currentCallPath[i+1]; // path 是从目标->入口存储的，所以 i+1 是调用者
+                    }
+                    break;
+                }
+            }
+
+            if (specific_caller_in_path && Ctx) {
+                // 现在我们只关心从 specific_caller_in_path 到 callee_function 的调用
+                auto it_callers = Ctx->Callers.find(callee_function);
+                if (it_callers != Ctx->Callers.end()) {
+                    const CallInstSet& all_calling_instructions = it_callers->second;
+                    for (llvm::CallInst* call_inst : all_calling_instructions) {
+                        // 检查这个 call_inst 是否在 specific_caller_in_path 中
+                        if (call_inst->getFunction() == specific_caller_in_path) {
+                            if (arg_no < call_inst->arg_size()) {
+                                llvm::Value* actual_arg_at_callsite = call_inst->getArgOperand(arg_no);
+                                if (actual_arg_at_callsite) {
+                                    analysisQueue.push(actual_arg_at_callsite);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // 全局变量是常量。如果一个全局变量是结构体指针，它是一个根。
+        // 上面的 isPotentialCS 会处理这种情况。
+    }
+    if (iterations >= MAX_ITERATIONS) {
+        // Optional: RES_REPORT("    [Trace for " << pathIdentifier << " reached max iterations for a startValue]\n");
+    }
 }
 
 
