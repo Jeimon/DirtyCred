@@ -15,9 +15,13 @@
 
 class PageAnalyzerPass : public IterativeModulePass {
 public:
-  std::set<std::pair<llvm::StringRef, int>> pageStructField = {
-    std::make_pair("struct.pci_filp_private", 0),
-    std::make_pair("struct.vm_fault", 8),
+  std::set<std::pair<llvm::StringRef, int>> KeyStructField = {
+    // std::make_pair("struct.pci_filp_private", 0),
+    // std::make_pair("struct.vm_fault", 8),
+
+    std::make_pair("struct.kbase_context", 14),
+    std::make_pair("struct.kbase_mem_phy_alloc", 4),
+    std::make_pair("struct.kbase_alloc_import_user_buf", 3),
   };
   // Please check if these struct definitions are removed in LLVM IR
   // If so, you need to use the annotation in this project to attach user-customized metadata to IR, which
@@ -31,7 +35,7 @@ public:
   virtual bool doInitialization(Module *);
   virtual bool doFinalization(Module *);
   virtual bool doModulePass(Module *);
-  bool isPageStruct(StructType *st, Indices& indices);
+  bool isKeyStruct(StructType *st, Indices& indices);
 };
 
 #endif

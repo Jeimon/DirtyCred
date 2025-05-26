@@ -6,6 +6,8 @@
 #include <vector>
 #include <map>
 #include <llvm/IR/Function.h>
+#include "KeyStructureAnalyzer.h"
+#include <llvm/Support/raw_ostream.h>
 
 #ifndef _CALL_GRAPH_H_STRUCT_DEF_
 #define _CALL_GRAPH_H_STRUCT_DEF_
@@ -42,17 +44,15 @@ private:
   bool findFunctions(llvm::Value *, FuncSet &,
                      llvm::SmallPtrSet<llvm::Value *, 4>);
   void recursiveDumpPaths(llvm::Function *currentFunc, unsigned int currentDepth, std::vector<llvm::Function*> &path, FuncSet &visitedNodesInDFS, std::map<llvm::Function*, CallTreeNode*>& activeTreeNodes);
-  void backwardTraceForControlStructure(
-    llvm::Value* startValue,
-    const std::string& pathIdentifier,
-    std::set<llvm::Value*>& potentialControlStructures,
-    const std::vector<llvm::Function*>& currentCallPath,
-    llvm::Function* rootInterfaceFuncForThisPath
-);
+  GlobalContext *Ctx;
+  std::unique_ptr<KeyStructureAnalyzer> KSA;
+
 public:
   std::map<const llvm::Function*, std::map<llvm::Function*, CallTreeNode*>> PerFunctionCallTrees;
 
-  CallGraphPass(GlobalContext *Ctx_) : IterativeModulePass(Ctx_, "CallGraph") {}
+  CallGraphPass(GlobalContext *Ctx_) : IterativeModulePass(Ctx_, "CallGraph"), Ctx(Ctx_) {
+    KSA = std::make_unique<KeyStructureAnalyzer>(Ctx);
+  }
   virtual bool doInitialization(llvm::Module *);
   virtual bool doFinalization(llvm::Module *);
   virtual bool doModulePass(llvm::Module *);
@@ -61,7 +61,7 @@ public:
   void dumpFuncPtrs();
   void dumpCallees();
   void dumpCallers();
-  void dumpCallPathsForFunc(Function *func, unsigned limits);
+  void dumpCallPathsForFunc(llvm::Function *targetFunc, unsigned int limits);
 };
 
 #endif

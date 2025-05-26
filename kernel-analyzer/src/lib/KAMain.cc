@@ -182,17 +182,18 @@ int main(int argc, char **argv) {
   CallGraphPass CGPass(&GlobalCtx);
   CGPass.run(GlobalCtx.Modules);
 
-  for (auto func : GlobalCtx.IRFuncDumpPath) {
-    CGPass.dumpCallPathsForFunc(func, 0);
-  }
+  // for (auto func : GlobalCtx.IRFuncDumpPath) {
+    // CGPass.dumpCallPathsForFunc(func, 0);
+  // }
 
   // another print
   
 
 
-  // PageAnalyzerPass PGPass(&GlobalCtx);
-  // PGPass.run(GlobalCtx.Modules);
+  PageAnalyzerPass PGPass(&GlobalCtx);
+  PGPass.run(GlobalCtx.Modules);
 
+  // Ctx->pageAllocation
   // for (auto func : GlobalCtx.pageAllocation) {
     // CGPass.dumpCallPathsForFunc(func, 0);
   // }

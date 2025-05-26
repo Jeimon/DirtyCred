@@ -1,4 +1,3 @@
-
 #include "GlobalCtx.h"
 #include "StructAnalyzer.h"
 #include "llvm/ADT/StringRef.h"
@@ -10,10 +9,12 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/Casting.h"
-
 #include "PageAnalyzer.h"
+#include <cctype> // Added for std::isdigit
 
 using namespace llvm;
+
+std::string lastMatchedKeyStructName;
 
 // only care about case where all indices are constantint
 void get_gep_indicies(GetElementPtrInst *gep, Indices &indices) {
@@ -107,14 +108,37 @@ bool PageAnalyzerPass::doInitialization(Module *M) {
     return false;
 }
 
+// Helper function to get base struct name if suffixed (e.g., struct.name.123 -> struct.name)
+static std::string getBaseStructName(llvm::StringRef fullName) {
+    if (fullName.empty()) return "";
+    size_t dotPos = fullName.rfind('.');
+    // Check if there's a dot, it's not the first char, and there's something after it
+    if (dotPos != llvm::StringRef::npos && dotPos > 0 && dotPos < fullName.size() - 1) {
+        llvm::StringRef suffix = fullName.substr(dotPos + 1);
+        bool suffixIsNumeric = !suffix.empty();
+        for (char c : suffix) {
+            if (!std::isdigit(c)) {
+                suffixIsNumeric = false;
+                break;
+            }
+        }
+        if (suffixIsNumeric) {
+            return fullName.substr(0, dotPos).str(); // Return part before dot
+        }
+    }
+    return fullName.str(); // Return full name if no recognized numeric suffix
+}
 
-bool PageAnalyzerPass::isPageStruct(StructType *st, Indices &indices) {
+bool PageAnalyzerPass::isKeyStruct(StructType *st, Indices &indices) {
     if (st == nullptr || indices.size() == 0)
         return false;
 
     if (indices.size() ==  1) {
-        for (auto sf: pageStructField) {
-            if (indices.front() == sf.second && st->getStructName().str() == sf.first) {
+        std::string currentStructNameBase = getBaseStructName(st->getStructName());
+        for (auto sf: KeyStructField) {
+            // Compare base name with sf.first
+            if (indices.front() == sf.second && currentStructNameBase == sf.first) {
+                lastMatchedKeyStructName = sf.first.str();
                 return true;
             }
         }
@@ -123,42 +147,63 @@ bool PageAnalyzerPass::isPageStruct(StructType *st, Indices &indices) {
         indices.pop_front();
         if (field < 0 || st->getNumElements() <= field)
             return false;
-        return isPageStruct(dyn_cast_or_null<StructType>(st->getElementType(field)), indices);
+        return isKeyStruct(dyn_cast_or_null<StructType>(st->getElementType(field)), indices);
     }
     return false;
 }
+
 
 
 bool PageAnalyzerPass::doModulePass(Module *M) {
     for (auto &F : *M) {
         for (auto i = inst_begin(F), e = inst_end(F); i != e; i++) {
           Instruction *I = &*i;
-          // you can remove this if needed
-          // First: find page allocation location
-          if (auto CI = dyn_cast_or_null<CallInst>(I)) {
-            Function *callee = CI->getCalledFunction();
-            if (callee && isPageAllocator(callee))
-                Ctx->pageAllocation.insert(callee);
-          }
+        //   // you can remove this if needed
+        //   // First: find page allocation location
+        //   if (auto CI = dyn_cast_or_null<CallInst>(I)) {
+        //     Function *callee = CI->getCalledFunction();
+        //     if (callee && isPageAllocator(callee))
+        //         Ctx->pageAllocation.insert(callee);
+        //   }
 
           // Second: find store instructions that store to certain struct field
           if (auto gep = dyn_cast_or_null<GetElementPtrInst>(I)) {
             Type * source = gep->getSourceElementType();
-            Indices indices;
+            Indices indices; // Will contain all GEP indices initially
             get_gep_indicies(gep, indices);
-            indices.pop_front();
+            
+            if (indices.empty()) { // Should have at least one index for the base pointer
+                continue;
+            }
+            indices.pop_front(); // Remove the 0th GEP index (for the base pointer itself)
+                                 // 'indices' now contains only the field/element indices.
 
             if (ArrayType *arr = dyn_cast_or_null<ArrayType>(source)) {
                 source = arr->getArrayElementType();
             }
             StructType *st = dyn_cast_or_null<StructType>(source);
 
-            if(isPageStruct(st, indices)) {
-                errs() << "found: " << *gep << "\n";
+            if (!st) { // isKeyStruct expects a valid starting struct type
+                continue;
+            }
+
+            // Create a copy of 'indices' to pass to isKeyStruct,
+            // because isKeyStruct modifies its Indices argument (by calling pop_front).
+            Indices indices_for_call = indices; 
+            if(isKeyStruct(st, indices_for_call)) {
+                errs() << "Found GEP for a key struct field in Func [" << gep->getFunction()->getName() << "]: " << *gep << "\n";
                 if (usedInStore(gep)) {
                      // the current version does not add the resitriction
                     //  should we add the restriction? the source operand should come from the page allocator?
-                    Ctx->pageAllocation.insert(gep->getFunction());
+                    // errs() << "Found GEP for a key struct field in Func [" << gep->getFunction()->getName() << "]: " << *gep << "\n";
+                    errs() << "  -> Key Struct Name: " << lastMatchedKeyStructName << "\n";
+                    Function *targetFunc = gep->getFunction();
+                    bool inserted = Ctx->pageAllocation.insert(targetFunc).second;
+                    if (inserted) {
+                        errs() << "  -> Added function to pageAllocation: " << targetFunc->getName() << "\n\n";
+                    } else {
+                        errs() << "  -> Function already in pageAllocation: " << targetFunc->getName() << "\n";
+                    }
                 }      
             }
                

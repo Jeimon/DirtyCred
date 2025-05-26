@@ -1,4 +1,4 @@
-set(KASource KAMain.cc Annotation.cc StructAnalyzer.cc CallGraph.cc CredAnalyzer.cc PageAnalyzer.cc)
+set(KASource KAMain.cc Annotation.cc StructAnalyzer.cc CallGraph.cc CredAnalyzer.cc PageAnalyzer.cc KeyStructureAnalyzer.cc)
 
 #Build libraries.
 #add_library(KAObj OBJECT ${KASource})

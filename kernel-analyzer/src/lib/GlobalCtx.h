@@ -108,11 +108,11 @@ static std::set<llvm::StringRef> AllocAPIs = {
 static std::set<llvm::StringRef> funcDumpPath = {
   // "mmu_insert_pages_no_flush",
 
-  // "kbase_mmu_insert_pages_no_flush",
-  // "kbase_mmu_insert_pages",
+  "kbase_mmu_insert_pages_no_flush",
+  "kbase_mmu_insert_pages",
   // "kbase_mmu_insert_pages_skip_status_update",
   // "kbase_mmu_insert_aliased_pages",
-  "kbase_mmu_insert_single_page",
+  // "kbase_mmu_insert_single_page",
   // "kbase_mmu_update_pages_no_flush",
 
   // "kbase_mem_pool_alloc_pages",
