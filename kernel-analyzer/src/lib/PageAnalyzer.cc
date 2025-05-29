@@ -15,8 +15,13 @@
 #include <list> // For std::list in findStoresToMemoryPointedBy
 #include <map>
 #include <set>
+#include <limits> // Added for std::numeric_limits
 
 using namespace llvm;
+
+// Maximum recursion depth for call chain analysis in findMapTypeSources
+const int MAX_RECURSION_DEPTH_MAP_TYPE = 30;
+const int64_t DEFAULT_CASE_MAP_TYPE_MARKER = std::numeric_limits<int64_t>::min();
 
 std::string lastMatchedKeyStructName;
 
@@ -399,6 +404,267 @@ void PageAnalyzerPass::findAllocationTypeSources(llvm::Module *M) {
         }
     }
     errs() << "--- End of Analysis ---\n\n";
+}
+
+// Helper function to analyze if a path from a basic block leads to a call to any map_wrapper_function
+// Uses a depth-limited search and keeps track of visited functions and basic blocks to avoid cycles and redundant work.
+bool PageAnalyzerPass::analyzePathForMapWrapper(llvm::BasicBlock* currentBB,
+                                                std::set<llvm::Function*>& visitedFunctionsInPath, // Tracks functions visited in the current specific call chain path
+                                                std::set<llvm::BasicBlock*>& visitedBlocksInCurrentFuncScope, // Tracks BBs visited *within the current function's scope* for the current path segment
+                                                int currentDepth,
+                                                const int maxDepth) {
+    if (!currentBB || currentDepth > maxDepth || visitedBlocksInCurrentFuncScope.count(currentBB)) {
+        return false;
+    }
+    visitedBlocksInCurrentFuncScope.insert(currentBB);
+
+    // Check instructions in the current basic block
+    for (Instruction &Inst : *currentBB) {
+        if (auto *CI = dyn_cast<CallInst>(&Inst)) {
+            // errs() << "DEBUG_APFMW: Found CallInst: " << *CI << "\n";
+
+            Value* calledValue = CI->getCalledOperand();
+            Function *calledFunc = nullptr;
+
+            if (calledValue) {
+                Value* strippedValue = calledValue->stripPointerCasts();
+                calledFunc = dyn_cast<Function>(strippedValue);
+            }
+            
+            // errs() << "DEBUG_APFMW: calledFunc (after stripPointerCasts): " << calledFunc;
+            if (calledFunc) {
+                // errs() << ", Has Name: " << calledFunc->hasName();
+                if (calledFunc->hasName()) {
+                    // errs() << ", Name: '" << calledFunc->getName() << "'";
+                }
+            }
+            // errs() << "\n";
+
+            if (calledFunc && calledFunc->hasName()) {
+                std::string calledFuncName = calledFunc->getName().str();
+                
+                std::string baseCalledFuncName = getBaseNameIfSuffixedString(calledFunc);
+                // errs() << "DEBUG_APFMW: baseCalledFuncName: '" << baseCalledFuncName << "'\n";
+
+                std::string effectiveCalledFuncName = !baseCalledFuncName.empty() ? baseCalledFuncName : calledFuncName;
+                // errs() << "DEBUG_APFMW: effectiveCalledFuncName: '" << effectiveCalledFuncName << "'\n";
+                
+                bool foundInWrappers = map_wrapper_functions.count(effectiveCalledFuncName);
+                // errs() << "DEBUG_APFMW: map_wrapper_functions.count(effectiveCalledFuncName): " << (foundInWrappers ? "YES" : "NO") << "\n";
+                if (!foundInWrappers) { // Conditional print of all wrappers
+                    // errs() << "DEBUG_APFMW: Known wrappers for comparison:\n";
+                    for (const auto& wrapper_name : map_wrapper_functions) {
+                    //    errs() << "  - '" << wrapper_name.str() << "'\n";
+                    }
+                }
+
+
+                if (foundInWrappers) {
+                    // errs() << "DEBUG_APFMW: SUCCESS - Found map_wrapper call to [" << effectiveCalledFuncName << "] in path.\n";
+                    return true; // Found a call to a map_wrapper function
+                }
+
+                // If the called function has a body and hasn't been visited in this specific path, recurse
+                if (!calledFunc->isDeclaration() && !visitedFunctionsInPath.count(calledFunc)) {
+                    visitedFunctionsInPath.insert(calledFunc);
+                    std::set<llvm::BasicBlock*> nextScopeVisitedBlocks; // Fresh set for the new function scope
+                    if (analyzePathForMapWrapper(&calledFunc->getEntryBlock(), visitedFunctionsInPath, nextScopeVisitedBlocks, currentDepth + 1, maxDepth)) {
+                        visitedFunctionsInPath.erase(calledFunc); // Backtrack: remove from visited for other paths
+                        return true;
+                    }
+                    visitedFunctionsInPath.erase(calledFunc); // Backtrack
+                }
+            }
+        }
+    }
+
+    // If no map_wrapper call found in this block, explore successors
+    auto *TI = currentBB->getTerminator();
+    if (!TI) {
+        return false;
+    }
+
+    for (unsigned i = 0, n = TI->getNumSuccessors(); i < n; ++i) {
+        BasicBlock *Succ = TI->getSuccessor(i);
+        // Note: visitedBlocksInCurrentFuncScope is passed along for successors *within the same function*.
+        // If we were to jump to another function (handled by CallInst recursion), a new set would be used.
+        if (analyzePathForMapWrapper(Succ, visitedFunctionsInPath, visitedBlocksInCurrentFuncScope, currentDepth, maxDepth)) { // currentDepth doesn't increase for intra-function traversal
+            return true;
+        }
+    }
+    return false;
+}
+
+void PageAnalyzerPass::findMapTypeSources(llvm::Module *M) {
+    std::map<std::string, std::set<int64_t>> functionToMapTypes;
+
+    for (auto &F : *M) {
+        if (!F.hasName()) continue;
+        std::string funcName = F.getName().str();
+
+        for (auto i = inst_begin(F), e = inst_end(F); i != e; ++i) {
+            Instruction *I = &*i;
+
+            if (auto *gep = dyn_cast_or_null<GetElementPtrInst>(I)) {
+                Type *sourceElementType = gep->getSourceElementType();
+                Indices indices;
+                get_gep_indicies(gep, indices);
+
+                if (indices.empty()) continue;
+                indices.pop_front(); 
+
+                if (ArrayType *arr = dyn_cast_or_null<ArrayType>(sourceElementType)) {
+                    sourceElementType = arr->getArrayElementType();
+                }
+                StructType *st = dyn_cast_or_null<StructType>(sourceElementType);
+
+                if (!st || !st->hasName()) continue;
+
+                std::string baseStructName = getBaseStructName(st->getStructName());
+
+                for (const auto& typeFieldPair : TypeField) {
+                    if (baseStructName == typeFieldPair.first.str() && indices.size() == 1 && indices.front() == typeFieldPair.second) {
+                        for (User *U : gep->users()) {
+                            if (auto *loadInst = dyn_cast<LoadInst>(U)) {
+                                for (User *LU : loadInst->users()) {
+                                    int64_t mapTypeValue = -1; // Placeholder for identified type value
+                                    BasicBlock* targetBB = nullptr; // BB to start analysis from
+
+                                    if (auto *cmpInst = dyn_cast<CmpInst>(LU)) {
+                                        Value *op0 = cmpInst->getOperand(0);
+                                        Value *op1 = cmpInst->getOperand(1);
+                                        ConstantInt *constIntOperand = nullptr;
+
+                                        if (dyn_cast<LoadInst>(op0) == loadInst && isa<ConstantInt>(op1)) {
+                                            constIntOperand = dyn_cast<ConstantInt>(op1);
+                                        } else if (dyn_cast<LoadInst>(op1) == loadInst && isa<ConstantInt>(op0)) {
+                                            constIntOperand = dyn_cast<ConstantInt>(op0);
+                                        }
+
+                                        if (constIntOperand) {
+                                            mapTypeValue = constIntOperand->getSExtValue();
+                                            // Determine the target basic block for the true branch of CmpInst
+                                            // This typically involves looking at the users of CmpInst, which should be a BranchInst (br)
+                                            for (User *cmpUser : cmpInst->users()) {
+                                                if (BranchInst *BI = dyn_cast<BranchInst>(cmpUser)) {
+                                                    if (BI->isConditional() && BI->getCondition() == cmpInst) {
+                                                        // Assuming CmpInst checks for equality (or predicate that implies equality for the desired path)
+                                                        // and we are interested in the path where the comparison is true.
+                                                        // For `value == X`, true branch is BI->getSuccessor(0)
+                                                        // For `value != X`, true branch (for path where value IS X) needs more complex logic or assumption
+                                                        // Let's assume for now we are interested in the branch taken when the cmp is true.
+                                                        // The specific successor depends on the predicate of CmpInst.
+                                                        // If CmpInst is EQ, then successor(0) is true, successor(1) is false.
+                                                        // If CmpInst is NE, then successor(0) is true (value != constIntOperand), successor(1) is false (value == constIntOperand).
+                                                        // We need to find the branch where the loaded value IS EQUAL to constIntOperand.
+                                                        CmpInst::Predicate pred = cmpInst->getPredicate();
+                                                        if (pred == CmpInst::ICMP_EQ) {
+                                                            targetBB = BI->getSuccessor(0); // True branch
+                                                        } else if (pred == CmpInst::ICMP_NE) {
+                                                            targetBB = BI->getSuccessor(1); // False branch (where they are equal)
+                                                        } else {
+                                                            // errs() << "DEBUG: CmpInst with unhandled predicate: " << cmpInst->getPredicateName(pred) << " in Func [" << funcName << "]\n";
+                                                            // For other predicates, we might need more sophisticated logic to choose the correct path.
+                                                            // For now, we'll skip if we can't clearly determine the target branch.
+                                                            continue;
+                                                        }
+                                                        break; // Found the BranchInst user
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else if (auto *switchInst = dyn_cast<SwitchInst>(LU)) {
+                                        if (switchInst->getCondition() == loadInst) {
+                                            for (auto &caseIt : switchInst->cases()) {
+                                                ConstantInt* caseValue = caseIt.getCaseValue();
+                                                if (caseValue) {
+                                                    int64_t currentCaseMapTypeValue = caseValue->getSExtValue();
+                                                    BasicBlock* caseBB = caseIt.getCaseSuccessor();
+                                                    std::set<llvm::Function*> visitedFunctionsInPath_switch;
+                                                    std::set<llvm::BasicBlock*> visitedBlocksInCurrentFuncScope_switch;
+                                                    //  errs() << "DEBUG: Analyzing Switch case value: " << currentCaseMapTypeValue << " in Func [" << funcName << "] leading to BB: ";
+                                                    //  if(caseBB->hasName()) errs() << caseBB->getName(); else errs() << "[unnamed BB]";
+                                                    //  errs() << " (" << caseBB << ")\n";
+                                                      if (analyzePathForMapWrapper(caseBB, visitedFunctionsInPath_switch, visitedBlocksInCurrentFuncScope_switch, 0, MAX_RECURSION_DEPTH_MAP_TYPE)) {
+                                                          functionToMapTypes[funcName].insert(currentCaseMapTypeValue);
+                                                        //  errs() << "  DEBUG: Func [" << funcName << "] checks TypeField '" << typeFieldPair.first.str() 
+                                                                // << "' idx " << typeFieldPair.second << " via SwitchInst, case value: " << currentCaseMapTypeValue << " -> Path leads to map_wrapper.\n";
+                                                      } else {
+                                                        //  errs() << "  DEBUG: Func [" << funcName << "] SwitchInst case " << currentCaseMapTypeValue << " -> Path DOES NOT lead to map_wrapper.\n";
+                                                      }
+                                                }
+                                            }
+                                            // After checking all explicit cases, analyze the default destination
+                                            BasicBlock* defaultDest = switchInst->getDefaultDest();
+                                            if (defaultDest) {
+                                                // errs() << "DEBUG: Analyzing Switch default case for Func [" << funcName << "] leading to BB: ";
+                                                // if(defaultDest->hasName()) errs() << defaultDest->getName(); else errs() << "[unnamed BB]";
+                                                // errs() << " (" << defaultDest << ")\n";
+
+                                                std::set<llvm::Function*> visitedFunctionsInPath_default;
+                                                std::set<llvm::BasicBlock*> visitedBlocksInCurrentFuncScope_default;
+                                                if (analyzePathForMapWrapper(defaultDest, visitedFunctionsInPath_default, visitedBlocksInCurrentFuncScope_default, 0, MAX_RECURSION_DEPTH_MAP_TYPE)) {
+                                                    functionToMapTypes[funcName].insert(DEFAULT_CASE_MAP_TYPE_MARKER);
+                                                    // errs() << "  DEBUG: Func [" << funcName << "] checks TypeField '" << typeFieldPair.first.str() 
+                                                        //    << "' idx " << typeFieldPair.second << " via SwitchInst default path -> Path leads to map_wrapper.\n";
+                                                } else {
+                                                    // errs() << "  DEBUG: Func [" << funcName << "] SwitchInst default path -> Path DOES NOT lead to map_wrapper.\n";
+                                                }
+                                            }
+                                            // After checking all cases (and default), continue to next user of loadInst.
+                                            continue; 
+                                        }
+                                    }
+
+                                    if (mapTypeValue != -1 && targetBB) {
+                                        std::set<llvm::Function*> visitedFunctionsInPath_cmp;
+                                        std::set<llvm::BasicBlock*> visitedBlocksInCurrentFuncScope_cmp;
+                                        //  errs() << "DEBUG: Analyzing CmpInst path for type value: " << mapTypeValue << " in Func [" << funcName << "] starting from BB: ";
+                                        //  if(targetBB->hasName()) errs() << targetBB->getName(); else errs() << "[unnamed BB]";
+                                        //  errs() << " (" << targetBB << ")\n";
+                                        if (analyzePathForMapWrapper(targetBB, visitedFunctionsInPath_cmp, visitedBlocksInCurrentFuncScope_cmp, 0, MAX_RECURSION_DEPTH_MAP_TYPE)) {
+                                            functionToMapTypes[funcName].insert(mapTypeValue);
+                                            //  errs() << "  DEBUG: Func [" << funcName << "] checks TypeField '" << typeFieldPair.first.str() 
+                                                    // << "' idx " << typeFieldPair.second << " via CmpInst, value: " << mapTypeValue << " -> Path leads to map_wrapper.\n";
+                                        } else {
+                                           // errs() << "  DEBUG: Func [" << funcName << "] CmpInst for value " << mapTypeValue << " -> Path DOES NOT lead to map_wrapper.\n";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // Found the relevant TypeField, no need to check other TypeFields for this GEP
+                        break; 
+                    }
+                }
+            }
+        }
+    }
+
+    // errs() << "\n--- Map Type Source Analysis (with path validation) ---\n";
+    if (functionToMapTypes.empty()) {
+        // errs() << "No functions found checking specified map type fields leading to a map_wrapper function.\n";
+    } else {
+        for (const auto& pair : functionToMapTypes) {
+            errs() << "Function [" << pair.first << "] checks for map types (and path leads to map_wrapper):\n";
+            for (int64_t typeVal : pair.second) {
+                std::string typeStr;
+                if (typeVal == DEFAULT_CASE_MAP_TYPE_MARKER) {
+                    typeStr = "ANY_OTHER_TYPE (Default Switch Path)";
+                } else {
+                    switch (typeVal) {
+                        case 0: typeStr = "KBASE_MEM_TYPE_NATIVE"; break;
+                        case 1: typeStr = "KBASE_MEM_TYPE_IMPORTED_UMM"; break;
+                        case 2: typeStr = "KBASE_MEM_TYPE_IMPORTED_USER_BUF"; break;
+                        case 3: typeStr = "KBASE_MEM_TYPE_ALIAS"; break;
+                        default: typeStr = "UNKNOWN_TYPE (" + std::to_string(typeVal) + ")"; break;
+                    }
+                }
+                errs() << "  -> " << typeStr << "\n";
+            }
+        }
+    }
+    // errs() << "--- End of Map Type Source Analysis ---\n\n";
 }
 
 bool PageAnalyzerPass::doFinalization(Module *M) {

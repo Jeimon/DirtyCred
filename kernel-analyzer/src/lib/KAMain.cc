@@ -191,14 +191,14 @@ int main(int argc, char **argv) {
 
   //2.construct call graph and find key structures
 
-  for (auto func : GlobalCtx.IRFuncDumpPath) {
-    CGPass.dumpCallPathsForFunc(func, 0);
-  } 
+  // for (auto func : GlobalCtx.IRFuncDumpPath) {
+    // CGPass.dumpCallPathsForFunc(func, 0);
+  // } 
 
   //get key map nodes
 
-  // PageAnalyzerPass PGPass(&GlobalCtx);
-  // PGPass.run(GlobalCtx.Modules);
+  PageAnalyzerPass PGPass(&GlobalCtx);
+  PGPass.run(GlobalCtx.Modules);
 
   //find key structures allocation callsites
 
@@ -220,7 +220,11 @@ int main(int argc, char **argv) {
 
   //find type for key map nodes
 
-
+  for (auto &modulePair : GlobalCtx.Modules) {
+    Module *currentModule = modulePair.first;
+    StringRef moduleName = modulePair.second;
+    PGPass.findMapTypeSources(currentModule); // 调用分析函数
+  }
 
   // Ctx->pageAllocation
   // for (auto func : GlobalCtx.pageAllocation) {

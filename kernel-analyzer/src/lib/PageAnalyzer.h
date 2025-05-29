@@ -24,6 +24,15 @@ public:
     std::make_pair("struct.kbase_alloc_import_user_buf", 3),
   };
 
+  std::set<llvm::StringRef> map_wrapper_functions = {
+  "kbase_mmu_insert_pages_no_flush",
+  "kbase_mmu_insert_pages",
+  "kbase_mmu_insert_pages_skip_status_update",
+  "kbase_mmu_insert_aliased_pages",
+  "kbase_mmu_insert_single_page",
+  "kbase_mmu_update_pages_no_flush",
+  };
+
   std::set<std::pair<llvm::StringRef, int>> TypeField = {
     std::make_pair("struct.kbase_mem_phy_alloc", 9),
   };
@@ -47,6 +56,13 @@ public:
   bool isKeyStruct(StructType *st, Indices& indices);
   void findAllocationTypeSources(llvm::Module *M);
   void analyzeKeyStructFieldGEPs(llvm::Module *M);
+  void findMapTypeSources(llvm::Module *M);
+
+  bool analyzePathForMapWrapper(llvm::BasicBlock* currentBB,
+                                std::set<llvm::Function*>& visitedFunctionsInPath,
+                                std::set<llvm::BasicBlock*>& visitedBlocksInCurrentFuncScope,
+                                int currentDepth,
+                                const int maxDepth);
 };
 
 #endif
