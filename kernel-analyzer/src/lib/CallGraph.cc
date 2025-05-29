@@ -773,11 +773,11 @@ void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
         RES_REPORT(" [You have reached an entry]\n\n");
 
         // Delegate to KeyStructureAnalyzer for analysis
-        if (!path.empty() && KSA) { // KSA should have been initialized in constructor
-            llvm::Function* targetOfPath = path[0]; // Root interface for this path
-            llvm::Function* entryPointForPath = path.back(); // Entry point for this path
-            KSA->analyzePathForKeyStructures(targetOfPath, path, entryPointForPath, pathStr);
-        }
+        // if (!path.empty() && KSA) { // KSA should have been initialized in constructor
+        //     llvm::Function* targetOfPath = path[0]; // Root interface for this path
+        //     llvm::Function* entryPointForPath = path.back(); // Entry point for this path
+        //     KSA->analyzePathForKeyStructures(targetOfPath, path, entryPointForPath, pathStr);
+        // }
         
         // Tree building logic (remains in CallGraphPass)
         CallTreeNode* parentTreeNode = nullptr;
@@ -815,6 +815,25 @@ void CallGraphPass::recursiveDumpPaths(llvm::Function *currentFunc,
 
     visitedNodesInDFS.erase(currentFunc);
     path.pop_back();
+}
+
+
+void CallGraphPass::getrootmapinterface(llvm::Module *M) {
+  // outs() << "Functions with kbase_mmu_table parameter:\n";
+  for (Function &F : *M) {
+    for (Argument &Arg : F.args()) {
+      Type *ArgTy = Arg.getType();
+      if (ArgTy->isPointerTy()) {
+        Type *PointeeTy = ArgTy->getPointerElementType();
+        if (PointeeTy->isStructTy()) {
+          StructType *ST = dyn_cast<StructType>(PointeeTy);
+          if (ST && ST->hasName() && ST->getName() == "struct.kbase_mmu_table") {
+            outs() << "  " << F.getName() << " - argument " << Arg.getArgNo() << " is struct kbase_mmu_table*\n";
+          }
+        }
+      }
+    }
+  }
 }
 
 

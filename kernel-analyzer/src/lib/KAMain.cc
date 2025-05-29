@@ -181,22 +181,49 @@ int main(int argc, char **argv) {
 
   CallGraphPass CGPass(&GlobalCtx);
   CGPass.run(GlobalCtx.Modules);
+  //1.find root mapping interface
 
-  // for (auto func : GlobalCtx.IRFuncDumpPath) {
-    // CGPass.dumpCallPathsForFunc(func, 0);
+  // for (auto &modulePair : GlobalCtx.Modules) {
+  //   Module *currentModule = modulePair.first;
+  //   StringRef moduleName = modulePair.second;
+  //   CGPass.getrootmapinterface(currentModule); 
   // }
 
-  // another print
-  
+  //2.construct call graph and find key structures
+
+  for (auto func : GlobalCtx.IRFuncDumpPath) {
+    CGPass.dumpCallPathsForFunc(func, 0);
+  } 
+
+  //get key map nodes
+
+  // PageAnalyzerPass PGPass(&GlobalCtx);
+  // PGPass.run(GlobalCtx.Modules);
+
+  //find key structures allocation callsites
+
+  // for (auto &modulePair : GlobalCtx.Modules) {
+  //   Module *currentModule = modulePair.first;
+  //   StringRef moduleName = modulePair.second;
+  //   PGPass.analyzeKeyStructFieldGEPs(currentModule); 
+  // }
+
+  //get key allocation nodes
+
+  //find type for key allocation nodes
+
+  // for (auto &modulePair : GlobalCtx.Modules) {
+  //   Module *currentModule = modulePair.first;
+  //   StringRef moduleName = modulePair.second;
+  //   PGPass.findAllocationTypeSources(currentModule); // 调用分析函数
+  // }
+
+  //find type for key map nodes
 
 
-  PageAnalyzerPass PGPass(&GlobalCtx);
-  PGPass.run(GlobalCtx.Modules);
 
   // Ctx->pageAllocation
   // for (auto func : GlobalCtx.pageAllocation) {
-    // CGPass.dumpCallPathsForFunc(func, 0);
-  // }
   errs() << "\n\n---------------------------struct field assignment-------------------------\n";
   // KA_LOGS(0, "ignore allocation? " << IgnoreAllocation << "\n");
   // CredAnalyzerPass CAPass(&GlobalCtx);

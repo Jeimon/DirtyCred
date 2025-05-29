@@ -62,6 +62,7 @@ public:
   void dumpCallees();
   void dumpCallers();
   void dumpCallPathsForFunc(llvm::Function *targetFunc, unsigned int limits);
+  void getrootmapinterface(llvm::Module *M);
 };
 
 #endif
