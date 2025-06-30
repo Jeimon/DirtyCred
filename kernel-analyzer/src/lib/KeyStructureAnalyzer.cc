@@ -5,6 +5,7 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Argument.h>
 #include <llvm/IR/GlobalValue.h>
+#include <llvm/IR/InstIterator.h> // For instructions()
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/ADT/StringRef.h>
 #include <queue> // For std::queue in backwardTrace
@@ -46,53 +47,93 @@ void KeyStructureAnalyzer::analyzePathForKeyStructures(
         RES_REPORT("  Error in KeyStructureAnalyzer: Target function is null for path: " << pathIdentifierString << "\n");
         return;
     }
-    // This check is important. entryPointFunction is derived from path.back() in CallGraphPass
-    // and passed here. If callPath is empty, path.back() would be an error.
-    if (callPath.empty() || !entryPointFunction) {
-         RES_REPORT("  Error in KeyStructureAnalyzer: Call path is empty or entry point function is null for path: " << pathIdentifierString << "\n");
-        return;
-    }
 
     std::set<llvm::Value*> pathKeyStructures;
-
-    unsigned arg_idx_to_analyze = 3; // Default to 4th argument (0-indexed)
-    unsigned min_args_required = 4;  // Default requirement for 4th argument
-    std::string arg_description_str = "4th";
     bool analysis_was_attempted = false;
 
-    std::string funcNameStr = targetFunction->getName().str();
-    if (funcNameStr == "kbase_mmu_insert_single_page") {
-        arg_idx_to_analyze = 2; // Analyze 3rd argument
-        min_args_required = 3;  // Min args for 3rd argument
-        arg_description_str = "3rd";
-    }
+    // --- Mode Check: Local analysis or path analysis? ---
+    bool is_local_analysis = (!callPath.empty() && callPath.size() == 1 && callPath[0] == targetFunction);
 
-    if (targetFunction->arg_size() >= min_args_required) {
-        analysis_was_attempted = true;
-        llvm::Argument* targetArgument = nullptr;
-        unsigned current_arg_idx = 0;
-        for (llvm::Argument &arg : targetFunction->args()) {
-            if (current_arg_idx == arg_idx_to_analyze) {
-                targetArgument = &arg;
-                break;
+    if (is_local_analysis) {
+        // --- Perform local-only analysis for mgm_vmf_insert_pfn_prot ---
+        RES_REPORT("\n  Performing in-function analysis for: " << targetFunction->getName().str() << "\n");
+        bool call_found = false;
+        for (Instruction &I : instructions(*targetFunction)) {
+            if (CallInst *CI = dyn_cast<CallInst>(&I)) {
+                if (!CI->isIndirectCall()) continue;
+                if (auto *LI = dyn_cast<LoadInst>(CI->getCalledOperand())) {
+                    if (auto *GEP = dyn_cast<GetElementPtrInst>(LI->getPointerOperand())) {
+                        llvm::Type* srcElemType = GEP->getSourceElementType();
+                        if (auto *ST = dyn_cast<StructType>(srcElemType)) {
+                            if (ST->hasName() && ST->getName().contains("struct.memory_group_manager_device")) {
+                                if (GEP->getNumIndices() == 3) {
+                                    auto* idx2 = dyn_cast<ConstantInt>(GEP->getOperand(2));
+                                    auto* idx3 = dyn_cast<ConstantInt>(GEP->getOperand(3));
+                                    if (idx2 && idx2->getZExtValue() == 0 && idx3 && idx3->getZExtValue() == 5) {
+                                        if (CI->arg_size() > 4) {
+                                            analysis_was_attempted = true;
+                                            call_found = true;
+                                            llvm::Value* fifth_arg = CI->getArgOperand(4);
+                                            RES_REPORT("    Found indirect call. Tracing 5th argument locally...\n");
+                                            backwardTraceForKeyStructure(fifth_arg, pathIdentifierString, pathKeyStructures, callPath, entryPointFunction);
+                                            goto local_analysis_reporting;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
-            current_arg_idx++;
         }
-
-        if (targetArgument) {
-            std::string targetArgNameStr = targetArgument->hasName() ? targetArgument->getName().str() : "unnamed_arg";
-            RES_REPORT("  Analyzing origin of " << arg_description_str << " argument ('" << targetArgNameStr << "') for root interface: " << funcNameStr << " in path: " << pathIdentifierString << "\n");
-            // Pass entryPointFunction (which is path.back() from the caller) as the rootInterfaceFuncForThisPath
-            backwardTraceForKeyStructure(targetArgument, pathIdentifierString, pathKeyStructures, callPath, entryPointFunction);
-        } else {
-            RES_REPORT("  Error: Could not retrieve " << arg_description_str << " argument for root interface: " << funcNameStr << " (expected index " << arg_idx_to_analyze << ", " << targetFunction->arg_size() << " args available)\n");
+        local_analysis_reporting:;
+        if (!call_found) {
+            RES_REPORT("    Warning: Did not find expected indirect call in " << targetFunction->getName().str() << "\n");
         }
     } else {
-        RES_REPORT("  Root interface " << funcNameStr << " has " << targetFunction->arg_size() << " arguments (fewer than " << min_args_required << "). Skipping Key structure analysis for " << arg_description_str << " arg.\n");
+        // --- Original full-path analysis logic ---
+        if (callPath.empty() || !entryPointFunction) {
+             RES_REPORT("  Error in KeyStructureAnalyzer: Call path is empty or entry point function is null for path: " << pathIdentifierString << "\n");
+            return;
+        }
+
+        unsigned arg_idx_to_analyze = 3; // Default to 4th argument (0-indexed)
+        unsigned min_args_required = 4;  // Default requirement for 4th argument
+        std::string arg_description_str = "4th";
+
+        std::string funcNameStr = targetFunction->getName().str();
+        if (funcNameStr == "kbase_mmu_insert_single_page") {
+            arg_idx_to_analyze = 2; // Analyze 3rd argument
+            min_args_required = 3;  // Min args for 3rd argument
+            arg_description_str = "3rd";
+        }
+
+        if (targetFunction->arg_size() >= min_args_required) {
+            analysis_was_attempted = true;
+            llvm::Argument* targetArgument = nullptr;
+            unsigned current_arg_idx = 0;
+            for (llvm::Argument &arg : targetFunction->args()) {
+                if (current_arg_idx == arg_idx_to_analyze) {
+                    targetArgument = &arg;
+                    break;
+                }
+                current_arg_idx++;
+            }
+
+            if (targetArgument) {
+                std::string targetArgNameStr = targetArgument->hasName() ? targetArgument->getName().str() : "unnamed_arg";
+                RES_REPORT("  Analyzing origin of " << arg_description_str << " argument ('" << targetArgNameStr << "') for root interface: " << funcNameStr << " in path: " << pathIdentifierString << "\n");
+                backwardTraceForKeyStructure(targetArgument, pathIdentifierString, pathKeyStructures, callPath, entryPointFunction);
+            } else {
+                RES_REPORT("  Error: Could not retrieve " << arg_description_str << " argument for root interface: " << funcNameStr << " (expected index " << arg_idx_to_analyze << ", " << targetFunction->arg_size() << " args available)\n");
+            }
+        } else {
+            RES_REPORT("  Root interface " << funcNameStr << " has " << targetFunction->arg_size() << " arguments (fewer than " << min_args_required << "). Skipping Key structure analysis for " << arg_description_str << " arg.\n");
+        }
     }
 
     if (!pathKeyStructures.empty()) {
-        RES_REPORT("    Potential Key Structures sourcing/related to the " << arg_description_str << " argument of '" << funcNameStr << "' for path '" << pathIdentifierString << "':\n");
+        RES_REPORT("    Potential Key Structures identified for path '" << pathIdentifierString << "':\n");
         for (llvm::Value* val : pathKeyStructures) {
             std::string valStr;
             llvm::raw_string_ostream rso(valStr);
@@ -124,7 +165,7 @@ void KeyStructureAnalyzer::analyzePathForKeyStructures(
         }
     } else {
         if (analysis_was_attempted) { 
-             RES_REPORT("    No specific Key structures identified sourcing/related to the " << arg_description_str << " argument for path: " << pathIdentifierString << "\n");
+             RES_REPORT("    No specific Key structures identified for path: " << pathIdentifierString << "\n");
         }
     }
     RES_REPORT("\n"); // Extra newline for readability
@@ -243,6 +284,29 @@ void KeyStructureAnalyzer::backwardTraceForKeyStructure(
             potentialKeyStructures.insert(current);
         }
 
+        if (llvm::GetElementPtrInst* GEP = llvm::dyn_cast<llvm::GetElementPtrInst>(current)) {
+            bool hasVariableIndex = false;
+            // Start from 1 to skip the pointer operand
+            for (unsigned i = 1; i < GEP->getNumOperands(); ++i) {
+                if (!llvm::isa<llvm::ConstantInt>(GEP->getOperand(i))) {
+                    hasVariableIndex = true;
+                    break;
+                }
+            }
+
+            if (hasVariableIndex) {
+                // This is likely an array access (e.g., pages[i]).
+                // We should trace where the array 'pages' comes from, so we trace the pointer operand.
+                analysisQueue.push(GEP->getPointerOperand());
+            } else {
+                // All indices are constants, indicating a direct field access (e.g., map->alloc).
+                // This is the source structure we are looking for. Report it and stop.
+                potentialKeyStructures.insert(GEP->getPointerOperand());
+            }
+            // In either case, we've handled the GEP, so skip the generic instruction processing.
+            continue;
+        }
+
         if (llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(current)) {
             for (Use &U : I->operands()) {
                 Value *operand = U.get();
@@ -260,6 +324,11 @@ void KeyStructureAnalyzer::backwardTraceForKeyStructure(
                 // We've reached the function that was considered the 'entry' or 'root' for this specific backward trace segment.
                 // No further upward tracing from this argument in this context.
                 continue; 
+            }
+
+            // If we are in local-only analysis mode, don't trace arguments up the call chain.
+            if (currentCallPath.size() <= 1) {
+                continue;
             }
 
             // Find the specific caller in the path to trace the argument back to.

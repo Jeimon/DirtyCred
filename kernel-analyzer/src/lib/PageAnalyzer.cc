@@ -97,35 +97,50 @@ bool isPageAllocator (Function *func) {
 
 
 
-bool usedInStore(GetElementPtrInst *gep) {
-    ValueList worklist;
-    ValueSet visited;
-    worklist.push_back(gep);
-    Value *po;
+bool usedInStore(Value *val) {
+    std::list<Value *> worklist;
+    std::set<Value *> visited;
+    worklist.push_back(val);
 
-    while(worklist.size()) {
-        po = worklist.front();
+    while(!worklist.empty()) {
+        Value *po = worklist.front();
         worklist.pop_front();
-        if (visited.find(po) != visited.end())
+
+        if (visited.count(po))
             continue;
         visited.insert(po);
 
-        for (auto user : gep->users()) {
-            if (ConstantExpr *cxpr = dyn_cast_or_null<ConstantExpr>(user)) {
-                Instruction *cxpri = cxpr->getAsInstruction();
-                worklist.push_back(cxpri);
-                continue;
-            }
-            else if (Instruction *i = dyn_cast_or_null<Instruction>(user)) {
-                switch (i->getOpcode()) {
-                    case (Instruction::PHI):
-                    case (BitCastInst::BitCast):
-                    case (Instruction::IntToPtr):
-                    case (Instruction::PtrToInt): {
-                        worklist.push_back(i);
-                    }
-                    case (Instruction::Store): {
-                        return true;
+        for (User *U : po->users()) {
+            if (isa<StoreInst>(U)) {
+                // The value `po` is the value being stored, not the pointer. 
+                // We are interested in whether `val` is used as a pointer for a store.
+                StoreInst *SI = cast<StoreInst>(U);
+                if (SI->getPointerOperand() == po) {
+                    return true;
+                }
+            } else if (isa<BitCastInst>(U) || isa<GetElementPtrInst>(U) || isa<PHINode>(U) || isa<SelectInst>(U)) {
+                worklist.push_back(U);
+            } else if (CallInst *CI = dyn_cast<CallInst>(U)) {
+                Function *callee = CI->getCalledFunction();
+                if (callee) {
+                    // Check if 'po' is passed as an argument
+                    for (unsigned i = 0; i < CI->arg_size(); ++i) {
+                        if (CI->getArgOperand(i) == po) {
+                            if (!callee->isDeclaration()) {
+                                // The value is passed as an argument to another function.
+                                // Add the corresponding Argument of the callee to the worklist.
+                                worklist.push_back(callee->getArg(i));
+                            } else {
+                                // For declarations (like llvm.memcpy, llvm.memset), check names
+                                if (callee->hasName()) {
+                                    StringRef name = callee->getName();
+                                    if (name.startswith("llvm.memcpy") || name.startswith("llvm.memset")) {
+                                        // The first argument is the destination pointer
+                                        if (i == 0) return true;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -160,20 +175,21 @@ static std::string getBaseStructName(llvm::StringRef fullName) {
 }
 
 bool PageAnalyzerPass::isKeyStruct(StructType *st, Indices &indices) {
-    if (st == nullptr || indices.size() == 0)
+    if (st == nullptr || indices.empty())
         return false;
 
-    if (indices.size() ==  1) {
-        std::string currentStructNameBase = getBaseStructName(st->getStructName());
-        for (auto const& sf: KeyStructField) {
-            if (indices.front() == sf.second && currentStructNameBase == sf.first.str()) {
-                this->currentMatchedKeyStructName = sf.first.str();
-                this->currentMatchedKeyStructFieldIndex = sf.second;
-                return true;
-            }
+    std::string currentStructNameBase = getBaseStructName(st->getStructName());
+    int field = indices.front();
+
+    for (auto const& sf : KeyStructField) {
+        if (field == sf.second && currentStructNameBase == sf.first.str()) {
+            this->currentMatchedKeyStructName = sf.first.str();
+            this->currentMatchedKeyStructFieldIndex = sf.second;
+            return true;
         }
-    } else {
-        int field = indices.front();
+    }
+
+    if (indices.size() > 1) {
         Indices next_indices = indices;
         next_indices.pop_front();
         

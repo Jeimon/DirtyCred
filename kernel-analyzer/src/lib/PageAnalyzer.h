@@ -22,6 +22,9 @@ public:
     std::make_pair("struct.kbase_context", 14),
     std::make_pair("struct.kbase_mem_phy_alloc", 4),
     std::make_pair("struct.kbase_alloc_import_user_buf", 3),
+    std::make_pair("struct.kbase_queue", 2),
+    std::make_pair("struct.kbase_device", 7),
+    std::make_pair("struct.kbase_csf_device", 10),
   };
 
   std::set<llvm::StringRef> map_wrapper_functions = {

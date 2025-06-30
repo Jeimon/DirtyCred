@@ -534,6 +534,54 @@ bool CallGraphPass::doFinalization(Module *M) {
   return false;
 }
 
+void CallGraphPass::analyzeMgmProtIndirectCalls(llvm::Module *M) {
+  // --- ANALYSIS DRIVER FOR MGM_PROT ---
+  RES_REPORT("\n[+] Starting analysis for mgm_vmf_insert_pfn_prot indirect calls.\n");
+  if (!M) return;
+
+  std::vector<llvm::Function*> mgmCallSiteFuncs;
+  for (Function &F : *M) {
+      if (F.isDeclaration()) continue;
+      for (Instruction &I : instructions(F)) {
+          if (CallInst *CI = dyn_cast<CallInst>(&I)) {
+              if (!CI->isIndirectCall()) continue;
+              if (auto *LI = dyn_cast<LoadInst>(CI->getCalledOperand())) {
+                  if (auto *GEP = dyn_cast<GetElementPtrInst>(LI->getPointerOperand())) {
+                      llvm::Type* srcElemType = GEP->getSourceElementType();
+                      if (auto *ST = dyn_cast<StructType>(srcElemType)) {
+                          if (ST->hasName() && ST->getName().contains("struct.memory_group_manager_device")) {
+                              if (GEP->getNumIndices() == 3) {
+                                  auto* idx2 = dyn_cast<ConstantInt>(GEP->getOperand(2));
+                                  auto* idx3 = dyn_cast<ConstantInt>(GEP->getOperand(3));
+                                  if (idx2 && idx2->getZExtValue() == 0 && idx3 && idx3->getZExtValue() == 5) {
+                                      mgmCallSiteFuncs.push_back(&F);
+                                      goto next_function;
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+      }
+      next_function:;
+  }
+
+  if (!mgmCallSiteFuncs.empty()) {
+      RES_REPORT("    Found " << mgmCallSiteFuncs.size() << " functions containing target indirect calls.\n");
+      for (Function *targetFunc : mgmCallSiteFuncs) {
+          if (KSA) {
+              std::vector<llvm::Function*> localPath = {targetFunc};
+              std::string idStr = "Local analysis in " + targetFunc->getName().str();
+              KSA->analyzePathForKeyStructures(targetFunc, localPath, targetFunc, idStr);
+          }
+      }
+  } else {
+      RES_REPORT("    No indirect calls to mgm_vmf_insert_pfn_prot found in the module.\n");
+  }
+  RES_REPORT("[+] Finished analysis for mgm_vmf_insert_pfn_prot.\n\n");
+}
+
 bool CallGraphPass::doModulePass(Module *M) {
   bool Changed = true, ret = false;
   while (Changed) {

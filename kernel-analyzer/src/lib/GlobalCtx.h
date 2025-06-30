@@ -117,13 +117,17 @@ static std::set<llvm::StringRef> funcDumpPath = {
   // "kbase_mmu_insert_single_page",
   // "kbase_mmu_update_pages_no_flush",
   
-  "kbase_mem_grow_gpu_mapping",
+  // "kbase_mem_grow_gpu_mapping",
 
-  //mapping allocate wrappers
+  //allocate wrappers
 
   // "kbase_context_mem_alloc_page",
   // "kbase_alloc_create",
   // "kbase_mem_from_user_buffer",
+  "registers_map",//indirect call
+  "kbase_csf_doorbell_mapping_init",
+  "kbase_csf_alloc_command_stream_user_pages",
+
 };
 
 

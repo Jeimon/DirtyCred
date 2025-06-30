@@ -181,7 +181,7 @@ int main(int argc, char **argv) {
 
   CallGraphPass CGPass(&GlobalCtx);
   CGPass.run(GlobalCtx.Modules);
-  //1.find root mapping interface
+  //1.find root mapping interface(each bc)
 
   // for (auto &modulePair : GlobalCtx.Modules) {
   //   Module *currentModule = modulePair.first;
@@ -189,26 +189,37 @@ int main(int argc, char **argv) {
   //   CGPass.getrootmapinterface(currentModule); 
   // }
 
-  //2.construct call graph and find key structures
+  //2.construct call graph and find key structures(link bc)
 
   // for (auto func : GlobalCtx.IRFuncDumpPath) {
     // CGPass.dumpCallPathsForFunc(func, 0);
   // } 
 
-  //get key map nodes
-
-  PageAnalyzerPass PGPass(&GlobalCtx);
-  PGPass.run(GlobalCtx.Modules);
-
-  //find key structures allocation callsites
-
   // for (auto &modulePair : GlobalCtx.Modules) {
   //   Module *currentModule = modulePair.first;
   //   StringRef moduleName = modulePair.second;
-  //   PGPass.analyzeKeyStructFieldGEPs(currentModule); 
+  //   CGPass.analyzeMgmProtIndirectCalls(currentModule); 
   // }
 
-  //get key allocation nodes
+  //get key map nodes
+
+  // PageAnalyzerPass PGPass(&GlobalCtx);
+  // PGPass.run(GlobalCtx.Modules);
+
+  //find key structures allocation callsites(each bc)
+  //./analyzer `find /home/lotus/lotus/llvm-project/csf_mainline//private/google-modules/gpu/mali_kbase/ -name "*.bc"`
+
+  // for (auto &modulePair : GlobalCtx.Modules) {
+    // Module *currentModule = modulePair.first;
+    // StringRef moduleName = modulePair.second;
+    // PGPass.analyzeKeyStructFieldGEPs(currentModule); 
+  // }
+
+  //get key allocation nodes(link bc)
+
+  for (auto func : GlobalCtx.IRFuncDumpPath) {
+    CGPass.dumpCallPathsForFunc(func, 0);
+  } 
 
   //find type for key allocation nodes
 
@@ -220,11 +231,11 @@ int main(int argc, char **argv) {
 
   //find type for key map nodes
 
-  for (auto &modulePair : GlobalCtx.Modules) {
-    Module *currentModule = modulePair.first;
-    StringRef moduleName = modulePair.second;
-    PGPass.findMapTypeSources(currentModule); // 调用分析函数
-  }
+  // for (auto &modulePair : GlobalCtx.Modules) {
+  //   Module *currentModule = modulePair.first;
+  //   StringRef moduleName = modulePair.second;
+  //   PGPass.findMapTypeSources(currentModule); // 调用分析函数
+  // }
 
   // Ctx->pageAllocation
   // for (auto func : GlobalCtx.pageAllocation) {
